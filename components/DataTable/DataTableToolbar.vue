@@ -13,12 +13,11 @@
             <!-- Column Visibility -->
             <Popover class="relative">
                 <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" class="h-8 border-dashed">
-                        <ViewIcon class="mr-2 h-4 w-4" />
-                        Colonnes
+                    <Button variant="outline" size="sm" class="h-8 border-dashed bg-blue-500 hover:bg-blue-100">
+                        <ViewIcon class="h-4 w-4 text-blue-100 hover:text-blue-500" />
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent class="w-80 p-0" align="start">
+                <PopoverContent class="w-80 p-0 mt-14" align="start">
                     <Command>
                         <CommandInput placeholder="Rechercher une colonne..." />
                         <CommandList>
@@ -51,10 +50,9 @@
                 <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" class="ml-auto">
                         <Download class="mr-2 h-4 w-4" />
-                        Exporter
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" class="mt-14">
                     <DropdownMenuItem @click="handleExportClick('csv')">
                         Export CSV
                     </DropdownMenuItem>

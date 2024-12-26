@@ -18,16 +18,23 @@ export default defineNuxtModule({
 
         // Configuration des routes
         nuxt.hook('pages:extend', (pages) => {
-            pages.push({
-                name: 'webstock',
-                path: '/erp/webstock',
-                file: resolve('./pages/vehicles.vue')
-            })
+            pages.push(
+                {
+                    name: 'webstock',
+                    path: '/erp/webstock',
+                    file: resolve('./pages/vehicles.vue')
+                },
+                {
+                    name: 'webstock-publish',
+                    path: '/erp/webstock/publish',
+                    file: resolve('./pages/publish.vue')
+                }
+            )
         })
 
         // Debug
         nuxt.hook('pages:extend', (pages) => {
-            console.log('Routes WebStock configurées:', 
+            console.log('Routes WebStock configurées:',
                 pages.filter(page => page.path.includes('webstock'))
             )
         })

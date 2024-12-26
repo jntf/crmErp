@@ -13,5 +13,5 @@
 </template>
 
 <script setup>
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { SidebarProvider } from '@/components/ui/sidebar'
 </script>

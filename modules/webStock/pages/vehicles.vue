@@ -5,6 +5,10 @@
             <h2 class="text-3xl font-bold tracking-tight">Stock Véhicules</h2>
             <p class="text-muted-foreground">Gérez votre stock de véhicules depuis différentes sources.</p>
         </div>
+        <Button variant="outline" size="sm" :disabled="!selectedVehicles.length" @click="goToPublish">
+            <PlusCircle class="mr-2 h-4 w-4" />
+            Publier sur le site
+        </Button>
 
         <DataTable :tableData="vehiclesData" :tableColumns="columns" :tableSettings="tableSettings"
             :cellRenderers="cellRenderers" :toolbarConfig="toolbarConfig" :loadingState="loading" @change="handleChange"
@@ -19,11 +23,15 @@ import DataTable from '@/components/DataTable/DataTable.vue'
 import { useVehicles } from '../composables/useVehicles'
 import { useToast } from '@/components/ui/toast/use-toast'
 import { exportToCSV, exportToExcel } from '@/components/DataTable/utils/export'
+import { useRouter } from 'vue-router'
+import { usePublishState } from '../composables/usePublishState'
 
 const { vehicles, loading, fetchVehicles } = useVehicles()
 const selectedVehicles = ref([])
 const exportFormat = ref('xlsx')
 const { toast } = useToast()
+const router = useRouter()
+const { setVehiclesForPublish } = usePublishState()
 
 // Colonnes pour le DataTable
 const columns = [
@@ -67,8 +75,8 @@ const columns = [
     },
     {
         data: 'registration_date',
-        title: 'Date MEC',
-        type: 'date'
+        title: 'M.E.C',
+        type: 'date',
     },
     {
         data: 'base_price',
@@ -168,6 +176,13 @@ const handleExport = (format: string) => {
     } else {
         exportToExcel(dataToExport, columns, toolbarConfig.exportFileName)
     }
+}
+
+function goToPublish() {
+    if (!selectedVehicles.value.length) return
+
+    setVehiclesForPublish(selectedVehicles.value)
+    router.push('/erp/webstock/publish')
 }
 
 onMounted(() => {
