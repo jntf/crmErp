@@ -37,7 +37,7 @@ export const useSidebarMenu = () => {
                 {
                     label: 'Dashboard',
                     icon: HomeIcon,
-                    path: '/dashboard'
+                    path: '/'
                 }
             ]
         },

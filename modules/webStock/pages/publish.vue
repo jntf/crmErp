@@ -42,7 +42,7 @@
                                     {{ formatPrice(calculateFinalPrice(vehicle.vehicleData.base_price)) }}
                                 </TableCell>
                                 <TableCell>
-                                    <Badge v-if="publishedVehicles[vehicle.vehicleData.id]" variant="success">
+                                    <Badge v-if="publishedVehicles[vehicle.vehicleData.id]" variant="default">
                                         Publié
                                     </Badge>
                                     <Badge v-else-if="failedVehicles[vehicle.vehicleData.id]" variant="destructive">
@@ -156,6 +156,7 @@ const { selectedVehiclesForPublish } = usePublishState()
 
 
 const vehicles = ref(selectedVehiclesForPublish.value)
+console.log(vehicles.value)
 const priceStrategy = ref<'fixed' | 'margin' | 'percentage'>('fixed')
 const fixedPrice = ref<number>(0)
 const marginAmount = ref<number>(0)
@@ -202,38 +203,59 @@ async function publishVehicles() {
     if (!isValid.value) return
 
     isPublishing.value = true
-    let successCount = 0
-    let errorCount = 0
+    const supabase = useSupabaseClient()
 
     try {
-        for (const vehicle of vehicles.value) {
-            try {
-                const finalPrice = calculateFinalPrice(vehicle.vehicleData.base_price)
-                await vehiclePublisher.publishVehicle(vehicle, finalPrice)
-                publishedVehicles.value[vehicle.vehicleData.id] = true
-                successCount++
-            } catch (error) {
-                console.error(`Erreur lors de la publication du véhicule ${vehicle.vehicleData.id}:`, error)
-                failedVehicles.value[vehicle.vehicleData.id] = true
-                errorCount++
-            }
-        }
+        const { data, error } = await supabase.rpc('insert_vehicles', {
+            vehicles: vehicles.value,
+            price_strategy: priceStrategy.value,
+            price_modifier: priceStrategy.value === 'fixed' ? 0 :
+                priceStrategy.value === 'margin' ? marginAmount.value :
+                    percentageAmount.value,
+            selling_price: priceStrategy.value === 'fixed' ? fixedPrice.value : null
+        } as any)
 
-        if (successCount > 0) {
-            toast({
-                title: "Publication terminée",
-                description: `${successCount} véhicule(s) publié(s) avec succès${errorCount > 0 ? `, ${errorCount} échec(s)` : ''
-                    }`,
-                variant: successCount === vehicles.value.length ? "default" : "warning"
+        if (error) throw error
+
+        const successCount = data.success.length
+        const errorCount = data.errors.length
+
+        // Mise à jour des statuts dans l'interface
+        data.success.forEach(id => {
+            publishedVehicles.value[id] = true
+        })
+        data.errors.forEach(err => {
+            failedVehicles.value[err.id] = true
+        })
+
+        // Notification du résultat
+        toast({
+            title: "Publication terminée",
+            description: `${successCount} véhicule(s) publié(s) avec succès${errorCount > 0 ? `, ${errorCount} échec(s)` : ''
+                }`,
+            variant: errorCount === 0 ? "default" : "warning"
+        })
+
+        // Affichage des erreurs détaillées si nécessaire
+        if (data.errors.length > 0) {
+            console.error('Erreurs de publication:', data.errors)
+            // Optionnel : afficher les erreurs spécifiques
+            data.errors.forEach(err => {
+                toast({
+                    title: `Erreur - Véhicule ${err.id}`,
+                    description: err.error,
+                    variant: "destructive"
+                })
             })
         }
 
-        if (successCount === vehicles.value.length) {
-            // Retour à la page précédente après un délai
+        if (errorCount === 0) {
+            // Retour à la page précédente après un délai en cas de succès total
             setTimeout(() => router.back(), 1500)
         }
+
     } catch (error) {
-        console.error('Erreur globale lors de la publication:', error)
+        console.error('Erreur lors de la publication:', error)
         toast({
             title: "Erreur de publication",
             description: error instanceof Error ? error.message : "Une erreur est survenue",
@@ -245,13 +267,13 @@ async function publishVehicles() {
 }
 
 onMounted(() => {
-  if (!vehicles.value.length) {
-    toast({
-      title: "Erreur",
-      description: "Aucun véhicule sélectionné pour la publication",
-      variant: "destructive"
-    })
-    router.push('/erp/webstock')
-  }
+    if (!vehicles.value.length) {
+        toast({
+            title: "Erreur",
+            description: "Aucun véhicule sélectionné pour la publication",
+            variant: "destructive"
+        })
+        router.push('/erp/webstock')
+    }
 })
 </script>

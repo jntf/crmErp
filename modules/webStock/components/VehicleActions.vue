@@ -139,7 +139,7 @@ async function publishVehicles() {
     toast({
       title: "Publication réussie",
       description: `${props.selectedVehicles.length} véhicule(s) publié(s) avec succès.`,
-      variant: "success"
+      variant: "default"
     })
 
     emit('success')

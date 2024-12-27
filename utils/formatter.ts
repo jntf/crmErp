@@ -10,7 +10,7 @@ export function formatMileage(mileage: number): string {
 export function formatDate(date: string): string {
     const [day, month, year] = date.split('/')
     if (day && month && year) { 
-        return `${day}-${month}-${year}`
+        return `${day}/${month}/${year}`
     }
-    return 'Not valid date'
+    return 'en cours'
 }
