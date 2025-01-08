@@ -128,6 +128,7 @@ photos_json AS (
         vpl.vehicle_id,
         jsonb_agg(
             jsonb_build_object(
+                'id', pr.id,
                 'url', pr.url,
                 'type', pr.type,
                 'position', vpl.position

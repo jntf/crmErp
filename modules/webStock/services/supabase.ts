@@ -148,8 +148,23 @@ export const useVehiclePublisher = () => {
         return vehicleData
     }
 
+    const getPublishedVehicles = async () => {
+        const { data, error } = await supabase
+            .from('exposed_vehicles')
+            .select('vehicle_id, source, status')
+            .eq('status', 'available')
+        
+        if (error) {
+            console.error('Erreur lors de la récupération des véhicules publiés:', error)
+            return []
+        }
+
+        return data || []
+    }
+
     return {
         publishVehicle,
-        checkVehicleExists
+        checkVehicleExists,
+        getPublishedVehicles
     }
 }

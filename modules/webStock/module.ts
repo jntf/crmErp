@@ -28,6 +28,11 @@ export default defineNuxtModule({
                     name: 'webstock-publish',
                     path: '/erp/webstock/publish',
                     file: resolve('./pages/publish.vue')
+                },
+                {
+                    name: 'webstock-edit',
+                    path: '/erp/webstock/edit/:source/:id',
+                    file: resolve('./pages/[source]/[id].vue')
                 }
             )
         })

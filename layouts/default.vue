@@ -2,12 +2,12 @@
     <SidebarProvider>
         <div class="flex min-h-screen w-full">
             <LayoutsAppSidebar />
-            <main class="flex-1 min-w-0">
-                <div class="p-8">
-                    <LayoutsAppTopbar />
+            <div class="flex-1 flex flex-col w-full">
+                <LayoutsAppTopbar />
+                <main class="flex-1 w-full p-8">
                     <NuxtPage />
-                </div>
-            </main>
+                </main>
+            </div>
         </div>
     </SidebarProvider>
 </template>

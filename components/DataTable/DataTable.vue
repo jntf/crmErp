@@ -122,12 +122,10 @@ const mergedTableSettings = computed(() => {
     const columnSettings = props.tableColumns
         ?.filter(col => visibleColumnIds.value.includes(col.data))
         .map(col => ({
-            data: col.data,
-            type: col.ype || 'text',
-            format: col.format,
+            ...col,
             className: `${col.className || ''} text-xs`,
             readOnly: !props.isEditable || col.readOnly,
-        }))
+        }));
 
     return {
         licenseKey: 'non-commercial-and-evaluation',
@@ -179,8 +177,6 @@ const handleSelection = (rowStart: number, colStart: number, rowEnd: number, col
             selected.push(processedTableData.value[rowIndex])
         }
     })
-
-    console.log('Final selected data:', selected)
     selectedItems.value = selected
     emit('selection', selected)
 }
@@ -283,17 +279,91 @@ onMounted(async () => {
 }
 
 .handsontable .htDropdownMenu {
-  padding: 0;
-  min-width: 180px;
+    padding: 0;
+    min-width: 180px;
 }
 
 .handsontable .htFiltersMenuCondition {
-  border: none;
+    border: none;
 }
 
 /* Pour le mode sombre */
 .dark .handsontable .htDropdownMenu {
-  background: #262626;
-  border-color: #333;
+    background: #262626;
+    border-color: #333;
+}
+
+* Styles pour les badges dans Handsontable */ .handsontable td div {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Assurer que les couleurs de fond des badges sont visibles en mode sombre */
+.dark .handsontable td div[class*="bg-"] {
+    background-color: inherit !important;
+}
+
+.handsontable td.htCenter {
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* Style pour les badges de statut */
+/* Style de base pour les badges */
+.handsontable td div[class*="inline-flex"] {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 60px;
+}
+
+/* Style spécifique pour le mode sombre */
+.dark .handsontable td div[class*="bg-green-100"] {
+    background-color: rgba(34, 197, 94, 0.2) !important;
+    color: rgb(34, 197, 94) !important;
+}
+
+.dark .handsontable td div[class*="bg-red-100"] {
+    background-color: rgba(239, 68, 68, 0.2) !important;
+    color: rgb(239, 68, 68) !important;
+}
+
+.dark .handsontable td div[class*="bg-blue-100"] {
+    background-color: rgba(59, 130, 246, 0.2) !important;
+    color: rgb(59, 130, 246) !important;
+}
+
+.dark .handsontable td div[class*="bg-gray-100"] {
+    background-color: rgba(156, 163, 175, 0.2) !important;
+    color: rgb(156, 163, 175) !important;
+}
+
+/* Alignement central pour les badges */
+.handsontable td.htCenter div[class*="inline-flex"] {
+    margin: 0 auto;
+}
+
+/* Style pour les boutons d'édition */
+.handsontable .edit-button {
+    color: rgb(107 114 128);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.handsontable .edit-button:hover {
+    color: rgb(59 130 246);
+}
+
+.dark .handsontable .edit-button:hover {
+    color: rgb(96 165 250);
+}
+
+/* Alignement vertical des cellules */
+.handsontable td {
+    vertical-align: middle !important;
+    line-height: 22px !important;
+    height: 22px !important;
 }
 </style>

@@ -156,7 +156,6 @@ const { selectedVehiclesForPublish } = usePublishState()
 
 
 const vehicles = ref(selectedVehiclesForPublish.value)
-console.log(vehicles.value)
 const priceStrategy = ref<'fixed' | 'margin' | 'percentage'>('fixed')
 const fixedPrice = ref<number>(0)
 const marginAmount = ref<number>(0)

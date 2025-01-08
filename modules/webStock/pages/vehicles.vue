@@ -25,6 +25,8 @@ import { useToast } from '@/components/ui/toast/use-toast'
 import { exportToCSV, exportToExcel } from '@/components/DataTable/utils/export'
 import { useRouter } from 'vue-router'
 import { usePublishState } from '../composables/usePublishState'
+import { useVehiclePublisher } from '../services/supabase'
+import { PlusCircle } from 'lucide-vue-next'
 
 const { vehicles, loading, fetchVehicles } = useVehicles()
 const selectedVehicles = ref([])
@@ -32,6 +34,22 @@ const exportFormat = ref('xlsx')
 const { toast } = useToast()
 const router = useRouter()
 const { setVehiclesForPublish } = usePublishState()
+const { getPublishedVehicles } = useVehiclePublisher()
+const publishedVehiclesMap = ref<Record<string, boolean>>({})
+
+const loadPublishedVehicles = async () => {
+    try {
+        const publishedVehicles = await getPublishedVehicles()
+        publishedVehiclesMap.value = publishedVehicles.reduce((acc, vehicle) => {
+            // Créer une clé unique combinant source et vehicle_id
+            const key = `${vehicle.source}-${vehicle.vehicle_id}`
+            acc[key] = true
+            return acc
+        }, {} as Record<string, boolean>)
+    } catch (error) {
+        console.error('Erreur lors du chargement des véhicules publiés:', error)
+    }
+}
 
 // Colonnes pour le DataTable
 const columns = [
@@ -44,6 +62,41 @@ const columns = [
         data: 'id',
         title: 'ID',
         type: 'text'
+    },
+    {
+        data: 'actions',
+        title: 'Actions',
+        type: 'text',
+        width: 50,
+        className: 'htCenter',
+        renderer(instance, td, row, col, prop, value) {
+            td.innerHTML = value;
+            return td;
+        }
+    },
+    {
+        data: 'isPublished',
+        title: 'Status',
+        type: 'text',
+        width: 70,
+        className: 'text-center status-badge',
+        renderer(instance, td, row, col, prop, value) {
+            // On s'attend à recevoir une string HTML
+            td.innerHTML = value;
+            return td;
+        }
+    },
+    {
+        data: 'photoCount',
+        title: 'Photos',
+        type: 'text',
+        width: 70,
+        className: 'text-center photos-badge',
+        renderer(instance, td, row, col, prop, value) {
+            // On s'attend à recevoir une string HTML
+            td.innerHTML = value;
+            return td;
+        }
     },
     {
         data: 'brand',
@@ -79,6 +132,14 @@ const columns = [
         type: 'date',
     },
     {
+        data: 'repair_cost',
+        title: 'Frais',
+        type: 'numeric',
+        format: '0,0',
+        suffix: ' €',
+        className: 'htRight'
+    },
+    {
         data: 'base_price',
         title: 'Prix',
         type: 'numeric',
@@ -86,34 +147,36 @@ const columns = [
         suffix: ' €',
         className: 'htRight'
     },
-    {
-        data: 'repair_cost',
-        title: 'Frais',
-        type: 'numeric',
-        format: '0,0',
-        suffix: ' €',
-        className: 'htRight'
-    }
 ]
 
 // Transformation des données en format plat
 const vehiclesData = computed(() => {
-    return vehicles.value.map(vehicle => ({
-        // Données de base du véhicule (format plat)
-        id: vehicle.vehicleData.id,
-        source: vehicle.vehicleData.source,
-        brand: vehicle.vehicleData.brand,
-        model: vehicle.vehicleData.model,
-        version: vehicle.vehicleData.version,
-        mileage: vehicle.vehicleData.mileage,
-        color: vehicle.vehicleData.color,
-        registration_date: vehicle.vehicleData.registration_date,
-        base_price: vehicle.vehicleData.base_price,
-        repair_cost: vehicle.vehicleData.repair_cost || 0,
+    return vehicles.value.map(vehicle => {
+        const publishKey = `${vehicle.vehicleData.source}-${vehicle.vehicleData.id}`
+        const isPublished = Boolean(publishedVehiclesMap.value[publishKey]) // Force un booléen
+        const photoCount = Number(vehicle.photos?.length || 0) // Force un nombre
 
-        // Garder les données complètes pour un usage ultérieur
-        _originalData: vehicle
-    }))
+        return {
+            // Données existantes
+            id: vehicle.vehicleData.id,
+            source: vehicle.vehicleData.source,
+            brand: vehicle.vehicleData.brand,
+            model: vehicle.vehicleData.model,
+            version: vehicle.vehicleData.version,
+            mileage: vehicle.vehicleData.mileage,
+            color: vehicle.vehicleData.color,
+            registration_date: vehicle.vehicleData.registration_date,
+            base_price: vehicle.vehicleData.base_price,
+            repair_cost: vehicle.vehicleData.repair_cost || 0,
+
+            // Nouvelles données
+            isPublished: isPublished,
+            photoCount: photoCount,
+
+            // Données originales
+            _originalData: vehicle
+        }
+    })
 })
 
 const tableSettings = {
@@ -125,16 +188,26 @@ const tableSettings = {
     selectionMode: 'multiple',
     outsideClickDeselects: false,
     multiSelect: true,
+    // colWidths: [40, 120, 80, 100, 100, 300], // Ajustez ces valeurs selon vos besoins
     currentRowClassName: 'current-row',
     currentColClassName: 'current-col',
-    // Ajout des paramètres suivants
-    // colWidths: [40, 120, 80, 100, 100, 300], // Ajustez ces valeurs selon vos besoins
     manualColumnResize: true,
-    fixedRowsTop: 1, // Fixe l'en-tête
-    fixedColumnsLeft: 2, // Fixe la première colonne (numérotation)
+    fixedRowsTop: 1,
+    fixedColumnsLeft: 2,
     renderAllRows: false,
     viewportRowRenderingOffset: 20,
-    rowHeaders: true // Pour afficher les numéros de ligne
+    rowHeaders: true,
+    afterOnCellMouseDown: (event: MouseEvent, coords: any, TD: HTMLElement) => {
+        const editButton = TD.querySelector('.edit-button');
+        if (editButton && (event.target === editButton || editButton.contains(event.target as Node))) {
+            event.stopPropagation();
+            
+            const rowData = vehiclesData.value[coords.row];
+            if (rowData) {
+                router.push(`/erp/webstock/edit/${rowData.source}/${rowData.id}`);
+            }
+        }
+    }
 }
 
 const toolbarConfig = {
@@ -143,13 +216,32 @@ const toolbarConfig = {
 }
 
 const cellRenderers = {
-    color: (value, row) => {
+    color: (value: string, row: any) => {
         if (!value) return ''
         return `${value}`
     },
-    repair_cost: (value, row) => {
+    repair_cost: (value: number, row: any) => {
         if (!value || value === 0) return ''
         return `${value.toLocaleString()}`
+    },
+    isPublished: (value: boolean) => {
+        const isPublished = Boolean(value);
+        return `<div class="inline-flex items-center justify-center h-5 w-5 rounded-full ${
+            isPublished 
+                ? 'bg-green-100 text-green-700' 
+                : 'bg-gray-100 text-gray-700'
+        }">${isPublished ? '●' : '○'}</div>`;
+    },
+    photoCount: (value: number) => {
+        const count = Number(value) || 0;
+        return `<div class="inline-flex items-center justify-center h-5 w-8 rounded-full ${
+            count > 0 
+                ? 'bg-blue-100 text-blue-700' 
+                : 'bg-red-100 text-red-700'
+        }">${count}</div>`;
+    },
+    actions: () => {
+        return `<span class="edit-button inline-flex items-center justify-center h-5 w-5 text-gray-500 cursor-pointer">✎</span>`;
     }
 }
 
@@ -157,7 +249,7 @@ const handleChange = (changes: Array<[number, string, any, any]>) => {
     console.log('Modifications:', changes)
 }
 
-const handleSelection = (selected) => {
+const handleSelection = (selected: any) => {
     console.log('Selection reçue dans vehicles:', selected)
     // Récupérer les données originales pour les véhicules sélectionnés
     selectedVehicles.value = selected.map(item =>
@@ -187,6 +279,7 @@ function goToPublish() {
 
 onMounted(() => {
     fetchVehicles()
+    loadPublishedVehicles()
 })
 </script>
 

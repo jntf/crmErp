@@ -1,18 +1,18 @@
-// modules/webStock/types/vehicle.types.ts
 export interface Vehicle {
     id: string
     source: string
     brand: string
     model: string
     version: string
-    registrationDate: string
+    registration_date: string 
     mileage: number
     color: string
     options: string[]
-    repairCost: number
-    basePrice: number
-    sellingPrice: number | null
+    repair_cost: number      
+    base_price: number       
+    selling_price: number | null
     vin: string
+    status: string          
 }
 
 export interface VehicleSource {
