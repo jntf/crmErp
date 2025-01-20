@@ -42,19 +42,14 @@ export const useSidebarMenu = () => {
             ]
         },
         {
-            label: 'CRM',
+            label: 'Entity',
             icon: FolderIcon,
             collapsible: true,
             items: [
                 {
-                    label: 'Contacts',
-                    icon: Users2Icon,
-                    path: '/crm/contacts'
-                },
-                {
-                    label: 'Entreprises',
+                    label: 'Companies',
                     icon: Building2Icon,
-                    path: '/crm/entreprises'
+                    path: '/entity/companies'
                 }
             ]
         },
@@ -77,7 +72,7 @@ export const useSidebarMenu = () => {
                     label: 'Gestion Web Stock',
                     icon: CarIcon,
                     path: '/erp/webstock',
-                    module: 'webStock'  // Nom du module pour vérification des droits
+                    module: 'webStock'
                 }
             ]
         }

@@ -61,6 +61,7 @@ const emit = defineEmits<{
     'update:tableData': [data: any[]];
     'change': [changes: any[]];
     'selection': [selectedRows: any[]];
+    'delete-request': [rowData: any[]];
 }>()
 
 const isHydrated = ref(false)
@@ -144,6 +145,17 @@ const mergedTableSettings = computed(() => {
         renderAllRows: true,
         afterSelectionEnd: (rowStart: number, colStart: number, rowEnd: number, colEnd: number) => {
             handleSelection(rowStart, colStart, rowEnd, colEnd)
+        },
+        afterOnCellMouseDown: (event: MouseEvent, coords: any, TD: HTMLElement) => {
+            const deleteButton = TD.querySelector('.delete-button');
+            if (deleteButton && (event.target === deleteButton || deleteButton.contains(event.target as Node))) {
+                event.stopPropagation();
+                const rowData = processedTableData.value[coords.row];
+                if (rowData) {
+                    // Émettre un événement pour la suppression au lieu de gérer directement
+                    emit('delete-request', [rowData]);
+                }
+            }
         },
         ...props.tableSettings
     }

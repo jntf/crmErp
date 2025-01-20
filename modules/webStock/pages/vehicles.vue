@@ -9,25 +9,43 @@
             <PlusCircle class="mr-2 h-4 w-4" />
             Publier sur le site
         </Button>
+        <Button variant="outline" size="sm" :disabled="!selectedVehicles.length || !hasPublishedSelected"
+            @click="showUnpublishConfirmation">
+            <MinusCircle class="mr-2 h-4 w-4" />
+            Dépublier la sélection
+        </Button>
+
+        <!-- <VehicleTableFilters v-model:selectedVehicles="selectedVehicles" :vehicles="vehiclesData" :loading="loading"
+            class="mb-4" /> -->
 
         <DataTable :tableData="vehiclesData" :tableColumns="columns" :tableSettings="tableSettings"
             :cellRenderers="cellRenderers" :toolbarConfig="toolbarConfig" :loadingState="loading" @change="handleChange"
             @selection="handleSelection" @export="handleExport">
         </DataTable>
     </div>
+    <!-- Modal de confirmation -->
+    <ConfirmationDialog v-model:isOpen="showConfirmDialog" title="Confirmer la dépublication"
+        :description="`Voulez-vous vraiment dépublier ${selectedVehicles.length} véhicule(s) ? Cette action les retirera du site web.`"
+        @confirm="handleUnpublish">
+        <template #confirm-button>
+            <Trash2 class="w-4 h-4 mr-2" />
+            Dépublier
+        </template>
+    </ConfirmationDialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import DataTable from '@/components/DataTable/DataTable.vue'
+import VehicleTableFilters from '../components/VehicleTable/VehicleTableFilters.vue'
 import { useVehicles } from '../composables/useVehicles'
 import { useToast } from '@/components/ui/toast/use-toast'
 import { exportToCSV, exportToExcel } from '@/components/DataTable/utils/export'
 import { useRouter } from 'vue-router'
 import { usePublishState } from '../composables/usePublishState'
 import { useVehiclePublisher } from '../services/supabase'
-import { PlusCircle } from 'lucide-vue-next'
-
+import { PlusCircle, MinusCircle, Trash2 } from 'lucide-vue-next'
+import ConfirmationDialog from '../components/ConfirmationDialog.vue'
 const { vehicles, loading, fetchVehicles } = useVehicles()
 const selectedVehicles = ref([])
 const exportFormat = ref('xlsx')
@@ -36,6 +54,14 @@ const router = useRouter()
 const { setVehiclesForPublish } = usePublishState()
 const { getPublishedVehicles } = useVehiclePublisher()
 const publishedVehiclesMap = ref<Record<string, boolean>>({})
+
+const showConfirmDialog = ref(false)
+
+// Fonction pour afficher le modal de confirmation
+const showUnpublishConfirmation = () => {
+    if (selectedVehicles.value.length === 0) return
+    showConfirmDialog.value = true
+}
 
 const loadPublishedVehicles = async () => {
     try {
@@ -201,7 +227,7 @@ const tableSettings = {
         const editButton = TD.querySelector('.edit-button');
         if (editButton && (event.target === editButton || editButton.contains(event.target as Node))) {
             event.stopPropagation();
-            
+
             const rowData = vehiclesData.value[coords.row];
             if (rowData) {
                 router.push(`/erp/webstock/edit/${rowData.source}/${rowData.id}`);
@@ -226,19 +252,17 @@ const cellRenderers = {
     },
     isPublished: (value: boolean) => {
         const isPublished = Boolean(value);
-        return `<div class="inline-flex items-center justify-center h-5 w-5 rounded-full ${
-            isPublished 
-                ? 'bg-green-100 text-green-700' 
-                : 'bg-gray-100 text-gray-700'
-        }">${isPublished ? '●' : '○'}</div>`;
+        return `<div class="inline-flex items-center justify-center h-5 w-5 rounded-full ${isPublished
+            ? 'bg-green-100 text-green-700'
+            : 'bg-gray-100 text-gray-700'
+            }">${isPublished ? '●' : '○'}</div>`;
     },
     photoCount: (value: number) => {
         const count = Number(value) || 0;
-        return `<div class="inline-flex items-center justify-center h-5 w-8 rounded-full ${
-            count > 0 
-                ? 'bg-blue-100 text-blue-700' 
-                : 'bg-red-100 text-red-700'
-        }">${count}</div>`;
+        return `<div class="inline-flex items-center justify-center h-5 w-8 rounded-full ${count > 0
+            ? 'bg-blue-100 text-blue-700'
+            : 'bg-red-100 text-red-700'
+            }">${count}</div>`;
     },
     actions: () => {
         return `<span class="edit-button inline-flex items-center justify-center h-5 w-5 text-gray-500 cursor-pointer">✎</span>`;
@@ -275,6 +299,76 @@ function goToPublish() {
 
     setVehiclesForPublish(selectedVehicles.value)
     router.push('/erp/webstock/publish')
+}
+
+// Ajouter le computed hasPublishedSelected
+const hasPublishedSelected = computed(() => {
+    return selectedVehicles.value.some(vehicle => {
+        const key = `${vehicle.vehicleData.source}-${vehicle.vehicleData.id}`
+        return publishedVehiclesMap.value[key]
+    })
+})
+
+// Ajouter la fonction handleUnpublish
+const handleUnpublish = async () => {
+    if (!selectedVehicles.value.length) return
+
+    try {
+        const supabase = useSupabaseClient()
+
+        const vehiclesToUnpublish = selectedVehicles.value.map(vehicle => ({
+            source: vehicle.vehicleData.source,
+            id: vehicle.vehicleData.id
+        }))
+
+        console.log('Vehicles to unpublish:', vehiclesToUnpublish)
+
+        const { data, error } = await supabase.rpc('unpublish_vehicles', {
+            vehicle_list: vehiclesToUnpublish
+        })
+
+        console.log('Unpublish response:', data)
+
+        if (error) throw error
+
+        // Attendre que la mise à jour soit terminée
+        await Promise.all([
+            loadPublishedVehicles(),
+            fetchVehicles()
+        ])
+
+        const successCount = (data.success || []).length
+        const errorCount = (data.errors || []).length
+
+        if (successCount > 0) {
+            toast({
+                title: "Dépublication terminée",
+                description: `${successCount} véhicule(s) dépublié(s) avec succès${errorCount > 0 ? ` (${errorCount} échec(s))` : ''
+                    }`,
+                variant: successCount > 0 ? "default" : "warning"
+            })
+        } else {
+            throw new Error('Aucun véhicule n\'a été dépublié')
+        }
+
+        if (errorCount > 0) {
+            data.errors.forEach((err: any) => {
+                toast({
+                    title: `Erreur - Véhicule ${err.id}`,
+                    description: err.error,
+                    variant: "destructive"
+                })
+            })
+        }
+
+    } catch (error) {
+        console.error('Erreur lors de la dépublication:', error)
+        toast({
+            title: "Erreur de dépublication",
+            description: error instanceof Error ? error.message : "Une erreur est survenue",
+            variant: "destructive"
+        })
+    }
 }
 
 onMounted(() => {

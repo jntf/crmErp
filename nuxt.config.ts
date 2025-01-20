@@ -21,7 +21,8 @@ export default defineNuxtConfig({
     'shadcn-nuxt',
     '@nuxtjs/supabase',
     '@pinia/nuxt',
-    './modules/webStock'
+    './modules/webStock',
+    './modules/entity'
   ],
   shadcn: {
     prefix: '',
@@ -35,6 +36,13 @@ export default defineNuxtConfig({
       options: {
         target: 'esnext'
       }
+    }
+  },
+  runtimeConfig: {
+    public: {
+      SOCIETE_INFO_API_KEY: process.env.PUBLIC_SOCIETE_INFO_API_KEY,
+      SOCIETE_INFO_API_URL: process.env.PUBLIC_SOCIETE_INFO_API_URL,
+      GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY
     }
   },
   compatibilityDate: '2024-12-24'

@@ -3,17 +3,25 @@
     <div class="flex items-center justify-between pb-4">
         <div class="flex flex-1 items-center space-x-2">
             <!-- Search -->
-            <div class="relative w-64">
+            <!-- <div class="relative w-64">
                 <input type="text" :placeholder="searchPlaceholder"
                     class="w-full pl-8 pr-2 py-1 text-sm border rounded-md dark:bg-gray-800 dark:border-gray-700"
                     v-model="searchValue" @input="handleSearch" />
                 <Search class="absolute left-2 top-1.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
-            </div>
+            </div> -->
 
-            <!-- Column Visibility -->
+            <!-- Selection info -->
+            <div v-if="selectedCount > 0" class="text-sm text-gray-500 dark:text-gray-400">
+                {{ selectedCount }} ligne{{ selectedCount > 1 ? 's' : '' }} sélectionnée{{ selectedCount > 1 ? 's' : ''
+                }}
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center space-x-2">
             <Popover class="relative">
                 <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" class="h-8 border-dashed bg-blue-500 hover:bg-blue-100">
+                    <Button variant="outline" size="sm" class="h-8 bg-blue-500 hover:bg-blue-100">
                         <ViewIcon class="h-4 w-4 text-blue-100 hover:text-blue-500" />
                     </Button>
                 </PopoverTrigger>
@@ -35,16 +43,6 @@
                     </Command>
                 </PopoverContent>
             </Popover>
-
-            <!-- Selection info -->
-            <div v-if="selectedCount > 0" class="text-sm text-gray-500 dark:text-gray-400">
-                {{ selectedCount }} ligne{{ selectedCount > 1 ? 's' : '' }} sélectionnée{{ selectedCount > 1 ? 's' : ''
-                }}
-            </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="flex items-center space-x-2">
             <!-- Export -->
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
