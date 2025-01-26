@@ -75,13 +75,16 @@ import {
     SunIcon,
     MoonIcon
 } from 'lucide-vue-next'
+import { useTheme } from '@/composables/useTheme'
 
-// État du thème
-const isDark = ref(false)
+const { isDark, toggleTheme } = useTheme()
 
-// Fonction pour basculer le thème
-const toggleTheme = () => {
-    isDark.value = !isDark.value
-    document.documentElement.classList.toggle('dark')
-}
+// Fonction pour initialiser le thème
+onMounted(() => {
+    const savedTheme = localStorage.getItem('theme')
+    if (savedTheme === 'dark') {
+        isDark.value = true
+        document.documentElement.classList.add('dark')
+    }
+})
 </script>

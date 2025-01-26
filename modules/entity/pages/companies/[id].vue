@@ -72,17 +72,11 @@
                         </CardContent>
                     </Card>
 
-                    <!-- Addresses Card -->
-                    <AddressesCard :addresses="addresses" readonly>
-                        <template #header-action>
-                            <Button variant="ghost" size="icon">
-                                <PencilIcon class="h-4 w-4" />
-                            </Button>
-                        </template>
-                    </AddressesCard>
+                    <AddressesCard :addresses="addresses" entity-type="company" :entity-id="companyData?.id"
+                        @refresh="refreshData" />
 
                     <!-- Contacts Card -->
-                    <ContactsCard :contacts="contacts" :company-id="companyData?.id" @refresh="fetchCompanyDetails" />
+                    <ContactsCard :contacts="contacts" :company-id="companyData?.id" @refresh="refreshData" />
 
                     <!-- Notes & Activity Card -->
                     <Card>
@@ -157,9 +151,6 @@ import {
     ArrowLeft,
     Building2,
     ScrollText,
-    BarChart3,
-    FileText,
-    MapPin,
     Tags,
     PencilIcon
 } from 'lucide-vue-next'
@@ -175,7 +166,6 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 
 // Custom Components
 import CompanyLogo from '@/modules/entity/components/companies/CompanyLogo.vue'
-import KeyFigure from '@/modules/entity/components/companies/KeyFigure.vue'
 import AddressesCard from '@/modules/entity/components/companies/AddressesCard.vue'
 import ContactsCard from '@/modules/entity/components/companies/ContactsCard.vue'
 import NotesTimeline from '@/modules/entity/components/companies/NotesTimeline.vue'
@@ -191,10 +181,10 @@ const { data: companyDetails, loading, error, fetchCompanyDetails } = useCompany
 const { updateCompany } = useCompanies()
 
 // Computed properties
-const companyData = computed(() => companyDetails.value?.company)
-const addresses = computed(() => companyDetails.value?.addresses || [])
-const contacts = computed(() => companyDetails.value?.contacts || [])
-const tags = computed(() => companyDetails.value?.tags || [])
+const companyData = computed(() => companyDetails.value?.company ?? null)
+const addresses = computed(() => companyDetails.value?.addresses ?? [])
+const contacts = computed(() => companyDetails.value?.contacts ?? [])
+const tags = computed(() => companyDetails.value?.tags ?? [])
 
 const selectedTags = ref(tags.value)
 
@@ -269,6 +259,12 @@ const saveKeyFigures = async (figures: {
     } catch (err) {
         console.error('Erreur lors de la sauvegarde des chiffres clés', err)
     }
+}
+
+const refreshData = async () => {
+  if (router.currentRoute.value.params.id) {
+    await fetchCompanyDetails(router.currentRoute.value.params.id as string)
+  }
 }
 
 // Initial data fetch

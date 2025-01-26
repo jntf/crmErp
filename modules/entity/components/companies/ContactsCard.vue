@@ -7,7 +7,6 @@
           <Users class="h-5 w-5" />
           Contacts
         </CardTitle>
-        <!-- Bouton d'ajout toujours visible -->
         <Button variant="ghost" size="icon" @click="openAddDialog">
           <PlusIcon class="h-4 w-4" />
         </Button>
@@ -24,7 +23,6 @@
       <!-- Liste des contacts -->
       <div v-else class="space-y-4">
         <div v-for="contact in contacts" :key="contact.id" class="flex flex-col p-4 rounded-lg border">
-          <!-- En-tête du contact -->
           <div class="flex items-start justify-between">
             <div class="space-y-1">
               <div class="flex items-center gap-2">
@@ -35,7 +33,6 @@
                 </Badge>
               </div>
 
-              <!-- Badges et Tags -->
               <div class="flex flex-wrap items-center gap-2">
                 <Badge v-if="contact.is_primary" variant="secondary">Principal</Badge>
                 <Badge v-if="contact.role" variant="outline">{{ contact.role }}</Badge>
@@ -47,7 +44,6 @@
               </div>
             </div>
 
-            <!-- Actions -->
             <div v-if="!readonly" class="flex items-center gap-1">
               <Button variant="ghost" size="icon" @click="editContact(contact)">
                 <PencilIcon class="h-4 w-4" />
@@ -58,16 +54,13 @@
             </div>
           </div>
 
-          <!-- Informations détaillées -->
           <div class="mt-4 grid gap-4 sm:grid-cols-2">
             <div class="space-y-2">
-              <!-- Informations professionnelles -->
               <div v-if="contact.job_title || contact.department" class="text-sm text-muted-foreground">
                 {{ contact.job_title }}
                 <span v-if="contact.department">• {{ contact.department }}</span>
               </div>
 
-              <!-- Coordonnées -->
               <div class="space-y-1 text-sm">
                 <div v-if="contact.email" class="flex items-center gap-2">
                   <Mail class="h-4 w-4" />
@@ -96,7 +89,6 @@
               </div>
             </div>
 
-            <!-- Notes -->
             <div v-if="contact.notes" class="text-sm">
               <p class="text-muted-foreground">Notes</p>
               <p class="mt-1">{{ contact.notes }}</p>
@@ -114,7 +106,7 @@
         </DialogHeader>
 
         <form @submit.prevent="saveContact" class="space-y-6">
-          <!-- Informations principales -->
+          <!-- Informations principales - inchangé -->
           <div class="space-y-4">
             <div class="grid grid-cols-2 gap-4">
               <div class="space-y-2">
@@ -144,7 +136,7 @@
             </div>
           </div>
 
-          <!-- Informations professionnelles -->
+          <!-- Informations professionnelles - inchangé -->
           <div class="space-y-4">
             <div class="grid grid-cols-2 gap-4">
               <div class="space-y-2">
@@ -181,18 +173,42 @@
               </div>
             </div>
 
+            <!-- Langue avec Select de shadcn -->
             <div class="space-y-2">
               <Label for="language">Langue préférée</Label>
               <Select v-model="form.language">
-                <option value="fr">Français</option>
-                <option value="en">Anglais</option>
-                <!-- Ajoutez d'autres langues selon vos besoins -->
+                <SelectTrigger>
+                  <SelectValue :placeholder="getLanguageLabel(form.language)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="fr">Français</SelectItem>
+                    <SelectItem value="en">Anglais</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
               </Select>
             </div>
 
+            <!-- Tags avec Select de shadcn -->
             <div class="space-y-2">
               <Label>Tags</Label>
-              <TagsSelect v-model="form.tags" />
+              <Select v-model="form.tagIds" multiple>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner des tags">
+                    {{ getSelectedTagsLabel(form.tagIds) }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem v-for="tag in availableTags" :key="tag.id" :value="tag.id">
+                      <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full" :style="{ backgroundColor: tag.color }" />
+                        {{ tag.name }}
+                      </div>
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -215,7 +231,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useSupabaseClient } from '#imports'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -224,7 +240,14 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Select } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Users,
@@ -233,7 +256,6 @@ import {
   Mail,
   Phone,
   Smartphone,
-  Pencil,
   Trash2,
   Linkedin as LinkedinIcon
 } from 'lucide-vue-next'
@@ -245,19 +267,6 @@ interface Tag {
   name: string
   color: string
   category: string
-}
-
-interface ContactAddress {
-  id: number
-  address_type: 'billing' | 'shipping' | 'main'
-  street_number: string
-  street_name: string
-  address_line2?: string
-  postal_code: string
-  city: string
-  state?: string
-  country_id: number
-  is_primary: boolean
 }
 
 interface Contact {
@@ -280,11 +289,13 @@ interface Contact {
   updated_at: string
   created_by?: string
   updated_by?: string
-  // Relations
   role?: string
   is_decision_maker: boolean
   tags: Tag[]
-  addresses: ContactAddress[]
+}
+
+interface FormData extends Partial<Contact> {
+  tagIds: string[]
 }
 
 interface Props {
@@ -306,7 +317,9 @@ const supabase = useSupabaseClient()
 const { toast } = useToast()
 const showDialog = ref(false)
 const isEditing = ref(false)
-const form = ref<Partial<Contact & { tags: Tag[] }>>({
+const availableTags = ref<Tag[]>([])
+
+const initialForm: FormData = {
   first_name: '',
   last_name: '',
   email: '',
@@ -321,29 +334,48 @@ const form = ref<Partial<Contact & { tags: Tag[] }>>({
   is_primary: false,
   is_decision_maker: false,
   role: '',
-  tags: []
-})
+  tagIds: []
+}
 
-// Actions
+const form = ref<FormData>({ ...initialForm })
+
+// Methods
+const getLanguageLabel = (language: string | undefined) => {
+  const languages = {
+    fr: 'Français',
+    en: 'Anglais'
+  }
+  return languages[language as keyof typeof languages] || 'Sélectionner une langue'
+}
+
+const getSelectedTagsLabel = (tagIds: string[]) => {
+  if (!tagIds?.length) return ''
+  const selectedTags = availableTags.value.filter(tag => tagIds.includes(tag.id))
+  return selectedTags.map(tag => tag.name).join(', ')
+}
+
+const fetchTags = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('tags')
+      .select('*')
+      .order('name')
+
+    if (error) throw error
+    availableTags.value = data
+  } catch (error) {
+    console.error('Error fetching tags:', error)
+    toast({
+      title: "Erreur",
+      description: "Impossible de charger les tags",
+      variant: "destructive"
+    })
+  }
+}
+
 const openAddDialog = () => {
   isEditing.value = false
-  form.value = {
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    mobile_phone: '',
-    job_title: '',
-    department: '',
-    linkedin_profile: '',
-    status: 'active',
-    notes: '',
-    language: 'fr',
-    is_primary: false,
-    is_decision_maker: false,
-    role: '',
-    tags: []
-  }
+  form.value = { ...initialForm }
   showDialog.value = true
 }
 
@@ -351,36 +383,40 @@ const editContact = (contact: Contact) => {
   isEditing.value = true
   form.value = {
     ...contact,
-    tags: [...(contact.tags || [])]
+    tagIds: contact.tags ? contact.tags.map(tag => tag.id) : []
   }
   showDialog.value = true
 }
 
 const saveContact = async () => {
   try {
+    const contactData = {
+      id: form.value.id,
+      first_name: form.value.first_name,
+      last_name: form.value.last_name,
+      email: form.value.email,
+      phone: form.value.phone,
+      mobile_phone: form.value.mobile_phone,
+      job_title: form.value.job_title,
+      department: form.value.department,
+      linkedin_profile: form.value.linkedin_profile,
+      status: form.value.status,
+      notes: form.value.notes,
+      language: form.value.language,
+      is_primary: form.value.is_primary,
+      company_id: props.companyId
+    }
+
+    const companyContactData = {
+      role: form.value.role,
+      is_decision_maker: form.value.is_decision_maker
+    }
+
     const { data, error } = await supabase.rpc('upsert_company_contact', {
-      p_contact: {
-        id: form.value.id,
-        first_name: form.value.first_name,
-        last_name: form.value.last_name,
-        email: form.value.email,
-        phone: form.value.phone,
-        mobile_phone: form.value.mobile_phone,
-        job_title: form.value.job_title,
-        department: form.value.department,
-        linkedin_profile: form.value.linkedin_profile,
-        status: form.value.status,
-        notes: form.value.notes,
-        language: form.value.language,
-        is_primary: form.value.is_primary,
-        company_id: props.companyId
-      },
-      p_company_contact: {
-        role: form.value.role,
-        is_decision_maker: form.value.is_decision_maker
-      },
-      p_tags: form.value.tags?.map(t => t.id)
-    } as any);
+      p_contact: contactData,
+      p_company_contact: companyContactData,
+      p_tags: form.value.tagIds
+    })
 
     if (error) throw error
 
@@ -405,7 +441,7 @@ const deleteContact = async (contactId: number) => {
     const { error } = await supabase.rpc('delete_company_contact', {
       p_contact_id: contactId,
       p_company_id: props.companyId
-    } as any)
+    })
 
     if (error) throw error
 
@@ -423,4 +459,40 @@ const deleteContact = async (contactId: number) => {
     })
   }
 }
+
+// Lifecycle hooks
+onMounted(async () => {
+  console.log('ContactsCard mounted')
+  console.log('Company ID:', props.companyId)
+  console.log('Initial contacts:', props.contacts)
+  await fetchTags()
+})
+
+// Watch pour la réinitialisation du formulaire
+watch(showDialog, (newValue) => {
+  if (!newValue) {
+    form.value = { ...initialForm }
+    isEditing.value = false
+  }
+})
+
+// Watch pour les props
+watch(() => props.contacts, (newContacts) => {
+  console.log('Contacts updated:', newContacts)
+}, { deep: true })
+
+// Computed properties pour la validation
+const isFormValid = computed(() => {
+  return form.value.first_name && form.value.last_name
+})
 </script>
+
+<style scoped>
+.contact-card {
+  transition: all 0.3s ease;
+}
+
+.contact-card:hover {
+  box-shadow: 0 0 0 1px var(--border);
+}
+</style>

@@ -32,8 +32,9 @@ export function useCompanyDetails() {
       }
 
       // Mise à jour réactive des données
-      data.value = responseData
-      console.log('Data updated:', data.value)
+      // data.value = responseData
+      // Forcer la réactivité en assignant une nouvelle référence
+      data.value = { ...data.value, ...responseData }
 
     } catch (err) {
       console.error('Erreur lors du chargement des détails:', err)

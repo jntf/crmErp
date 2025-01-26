@@ -1,8 +1,15 @@
 export default defineNuxtRouteMiddleware(async () => {
-    const userStore = useState('user')
+    console.log('=== ADMIN MIDDLEWARE ===')
+    const authStore = useAuthStore()
     const adminRoles = ['superadmin', 'admin']
 
-    if (!userStore.value.roles.some(role => adminRoles.includes(role))) {
+    console.log('Current user:', authStore.user)
+    console.log('Current roles in store:', authStore.roles)
+    
+    const hasAdminAccess = adminRoles.some(role => authStore.hasRole(role))
+    console.log('Has admin access:', hasAdminAccess)
+
+    if (!hasAdminAccess) {
         throw createError({
             statusCode: 403,
             message: 'Accès non autorisé'

@@ -2,93 +2,123 @@
 import {
     HomeIcon,
     Users2Icon,
-    Building2Icon,
+    BuildingIcon,
     FileTextIcon,
     ShoppingCartIcon,
     CarIcon,
-    BoxIcon,
-    FolderIcon
+    ClipboardIcon,
+    GlobeIcon
 } from 'lucide-vue-next'
 import { useModuleStore } from '@/stores/useModuleStore'
+import { useSidebarStore } from '@/stores/useSidebarStore'
+import { useAuthStore } from '@/stores/useAuthStore'
 
 export interface MenuItem {
     label: string
     icon: any
     path?: string
     module?: string
-    children?: MenuItem[]
+    description?: string
+    badge?: number | string
+    roles?: string[]
 }
 
-export interface MenuGroup {
+export interface MenuSection {
+    id: string
     label: string
     icon: any
-    collapsible?: boolean
     items: MenuItem[]
 }
 
 export const useSidebarMenu = () => {
     const moduleStore = useModuleStore()
+    const sidebarStore = useSidebarStore()
+    const authStore = useAuthStore()
 
-    const menuGroups: MenuGroup[] = [
+    const menuSections: MenuSection[] = [
         {
-            label: 'Navigation',
-            icon: HomeIcon,
+            id: 'contacts',
+            label: 'Contacts & Relations',
+            icon: Users2Icon,
             items: [
                 {
-                    label: 'Dashboard',
-                    icon: HomeIcon,
-                    path: '/'
+                    label: 'Entreprises',
+                    icon: BuildingIcon,
+                    path: '/entity/companies',
+                    roles: ['admin']
+                },
+                {
+                    label: 'Contacts',
+                    icon: Users2Icon,
+                    path: '/entity/contacts',
+                    roles: ['user']
                 }
             ]
         },
         {
-            label: 'Entity',
-            icon: FolderIcon,
-            collapsible: true,
-            items: [
-                {
-                    label: 'Companies',
-                    icon: Building2Icon,
-                    path: '/entity/companies'
-                }
-            ]
-        },
-        {
-            label: 'ERP',
-            icon: BoxIcon,
-            collapsible: true,
+            id: 'commercial',
+            label: 'Commercial',
+            icon: ClipboardIcon,
             items: [
                 {
                     label: 'Factures',
                     icon: FileTextIcon,
-                    path: '/erp/factures'
+                    path: '/erp/factures',
+                    badge: 3,
+                    roles: ['user']
                 },
                 {
                     label: 'Commandes',
                     icon: ShoppingCartIcon,
-                    path: '/erp/commandes'
+                    path: '/erp/commandes',
+                    badge: 5,
+                    roles: ['user']
+                }
+            ]
+        },
+        {
+            id: 'stock',
+            label: 'Stock & Véhicules',
+            icon: CarIcon,
+            items: [
+                {
+                    label: 'Gestion du stock',
+                    icon: CarIcon,
+                    path: '/stock',
+                    description: 'Gestion du parc de véhicules',
+                    module: 'stock',
+                    roles: ['admin', 'manager']
                 },
                 {
-                    label: 'Gestion Web Stock',
-                    icon: CarIcon,
+                    label: 'Véhicules en ligne',
+                    icon: GlobeIcon,
                     path: '/erp/webstock',
-                    module: 'webStock'
+                    description: 'Gestion des véhicules sur le site web',
+                    module: 'webStock',
+                    roles: ['admin', 'manager']
                 }
             ]
         }
     ]
 
-    // Filtrer les éléments de menu selon les droits d'accès
-    const filteredMenuGroups = computed(() => {
-        return menuGroups.map(group => ({
-            ...group,
-            items: group.items.filter(item =>
-                !item.module || moduleStore.hasAccess(item.module)
-            )
-        })).filter(group => group.items.length > 0)  // Supprimer les groupes vides
+    // Filtrer les sections et items selon les droits d'accès
+    const filteredMenuSections = computed(() => {
+        return menuSections
+            .map(section => ({
+                ...section,
+                items: section.items.filter(item => {
+                    const hasModuleAccess = !item.module || moduleStore.hasAccess(item.module)
+                    const hasRoleAccess = !item.roles?.length || item.roles.some(role => authStore.hasRole(role))
+                    return hasModuleAccess && hasRoleAccess
+                })
+            }))
+            .filter(section => section.items.length > 0)
     })
 
     return {
-        menuGroups: filteredMenuGroups
+        menuSections: filteredMenuSections,
+        isCollapsed: computed(() => sidebarStore.isCollapsed),
+        isMobile: computed(() => sidebarStore.isMobile),
+        toggleCollapsed: () => sidebarStore.setCollapsed(!sidebarStore.isCollapsed)
     }
 }

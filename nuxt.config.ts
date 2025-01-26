@@ -22,7 +22,8 @@ export default defineNuxtConfig({
     '@nuxtjs/supabase',
     '@pinia/nuxt',
     './modules/webStock',
-    './modules/entity'
+    './modules/entity',
+    './modules/stock'
   ],
   shadcn: {
     prefix: '',

@@ -36,12 +36,5 @@ export default defineNuxtModule({
                 }
             )
         })
-
-        // Debug
-        nuxt.hook('pages:extend', (pages) => {
-            console.log('Routes WebStock configurées:',
-                pages.filter(page => page.path.includes('webstock'))
-            )
-        })
     }
 })
