@@ -15,8 +15,8 @@ interface CompanyLogo {
   created_at: string
 }
 
-const supabaseUrl = 'https://dzwlhpmkmnwzxaaeupqa.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6d2xocG1rbW53enhhYWV1cHFhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNDk0MjgwMSwiZXhwIjoyMDUwNTE4ODAxfQ.6izoHOpdVm0bRadk0Owcmmn41QZbDtFrFBuhpZ3EP54';
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
 serve(async (req) => {
