@@ -140,9 +140,41 @@ const mergedTableSettings = computed(() => {
         selectionMode: 'multiple',
         outsideClickDeselects: false,
         stretchH: 'all',
-        autoWrapRow: true,
+        autoWrapRow: false,
         rowHeights: 22,
-        renderAllRows: true,
+        colWidths: 100,
+        renderAllRows: false,
+        viewportRowRenderingOffset: 10,
+        fixedRowsTop: 1,
+        fixedColumnsLeft: 0,
+        wordWrap: false,
+        trimWhitespace: true,
+        tabMoves: { row: 1, col: 1 },
+        enterMoves: { row: 1, col: 0 },
+        fillHandle: false,
+        autoColumnSize: false,
+        contextMenu: {
+            items: {
+                row_above: false,
+                row_below: false,
+                hsep1: false,
+                col_left: false,
+                col_right: false,
+                hsep2: false,
+                remove_row: false,
+                remove_col: false,
+                hsep3: false,
+                undo: false,
+                redo: false,
+                hsep4: false,
+                make_read_only: false,
+                alignment: false,
+                hsep5: false,
+                borders: false,
+                commentsAddEdit: false,
+                commentsRemove: false
+            }
+        },
         afterSelectionEnd: (rowStart: number, colStart: number, rowEnd: number, colEnd: number) => {
             handleSelection(rowStart, colStart, rowEnd, colEnd)
         },
@@ -252,85 +284,107 @@ onMounted(async () => {
 
 <style>
 /* Styles de base */
+.data-table-wrapper {
+    position: relative;
+    z-index: 1;
+}
+
 .handsontable {
     font-size: 11px !important;
 }
 
-.handsontable td {
-    padding: 2px 4px !important;
-    height: 22px !important;
+/* Ajustement des z-index pour éviter les conflits avec les modals */
+.handsontable .wtHolder,
+.handsontable .ht_master,
+.handsontable .ht_clone_top,
+.handsontable .ht_clone_left,
+.handsontable .ht_clone_top_left_corner {
+    z-index: 10 !important;
 }
 
-/* Style des cellules */
-.handsontable td {
-    padding: 2px 4px !important;
-    height: 22px !important;
-    font-size: 11px !important;
-}
-
-/* Style des en-têtes et des filtres */
-.handsontable th {
-    font-size: 11px !important;
-    height: 22px !important;
-}
-
-/* Dark mode */
-.dark .handsontable td,
-.dark .handsontable tbody tr:nth-of-type(even) td,
-.dark .handsontable.ht_master tbody tr td {
-    background: #1a1a1a !important;
-    color: white !important;
-    border-color: #333 !important;
-}
-
-.dark .handsontable th,
-.dark .handsontable .ht_clone_top th {
-    background: #262626 !important;
-    color: white !important;
-    border-color: #333 !important;
-}
-
-.handsontable .htDropdownMenu {
-    padding: 0;
-    min-width: 180px;
-}
-
+/* Assurer que les menus contextuels restent sous les modals */
+.handsontable .htDropdownMenu,
+.handsontable .htContextMenu,
 .handsontable .htFiltersMenuCondition {
-    border: none;
+    z-index: 1000 !important;
 }
 
-/* Pour le mode sombre */
+/* Style compact pour les cellules */
+.handsontable td {
+    padding: 0 4px !important;
+    height: 22px !important;
+    line-height: 22px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    vertical-align: middle !important;
+    background-clip: padding-box !important;
+}
+
+/* Style des en-têtes */
+.handsontable th {
+    padding: 0 4px !important;
+    height: 22px !important;
+    line-height: 22px !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    text-align: left !important;
+    vertical-align: middle !important;
+}
+
+/* Dark mode - Style de base */
+.dark .handsontable {
+    background: #1a1a1a !important;
+}
+
+.dark .handsontable td {
+    background: #1a1a1a !important;
+    color: #ffffff !important;
+    border-color: #333333 !important;
+}
+
+.dark .handsontable tbody tr:nth-of-type(even) td {
+    background: #262626 !important;
+}
+
+.dark .handsontable th {
+    background: #262626 !important;
+    color: #ffffff !important;
+    border-color: #333333 !important;
+}
+
+/* Dark mode - En-têtes fixes */
+.dark .handsontable .ht_clone_top th,
+.dark .handsontable .ht_clone_left td,
+.dark .handsontable .ht_clone_top_left_corner th {
+    background: #262626 !important;
+}
+
+/* Dark mode - Menus contextuels */
 .dark .handsontable .htDropdownMenu {
-    background: #262626;
-    border-color: #333;
+    background: #262626 !important;
+    border-color: #333333 !important;
+    color: #ffffff !important;
 }
 
-* Styles pour les badges dans Handsontable */ .handsontable td div {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.dark .htDropdownMenu .ht_master .wtHolder {
+    background: #262626 !important;
 }
 
-/* Assurer que les couleurs de fond des badges sont visibles en mode sombre */
-.dark .handsontable td div[class*="bg-"] {
-    background-color: inherit !important;
+/* Dark mode - Sélection */
+.dark .handsontable tbody tr.ht__highlight td {
+    background: #2a4365 !important;
 }
 
-.handsontable td.htCenter {
-    text-align: center;
-    vertical-align: middle;
+.dark .handsontable .wtBorder.current {
+    background: #4299e1 !important;
 }
 
-/* Style pour les badges de statut */
-/* Style de base pour les badges */
-.handsontable td div[class*="inline-flex"] {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 60px;
+/* Style pour les badges de statut en mode sombre */
+.dark .handsontable td.htCenter div[class*="inline-flex"] {
+    background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Style spécifique pour le mode sombre */
 .dark .handsontable td div[class*="bg-green-100"] {
     background-color: rgba(34, 197, 94, 0.2) !important;
     color: rgb(34, 197, 94) !important;
@@ -346,36 +400,47 @@ onMounted(async () => {
     color: rgb(59, 130, 246) !important;
 }
 
+.dark .handsontable td div[class*="bg-yellow-100"] {
+    background-color: rgba(234, 179, 8, 0.2) !important;
+    color: rgb(234, 179, 8) !important;
+}
+
+.dark .handsontable td div[class*="bg-purple-100"] {
+    background-color: rgba(168, 85, 247, 0.2) !important;
+    color: rgb(168, 85, 247) !important;
+}
+
 .dark .handsontable td div[class*="bg-gray-100"] {
     background-color: rgba(156, 163, 175, 0.2) !important;
     color: rgb(156, 163, 175) !important;
 }
 
-/* Alignement central pour les badges */
-.handsontable td.htCenter div[class*="inline-flex"] {
-    margin: 0 auto;
-}
-
-/* Style pour les boutons d'édition */
-.handsontable .edit-button {
-    color: rgb(107 114 128);
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.handsontable .edit-button:hover {
-    color: rgb(59 130 246);
+/* Style pour les boutons d'action en mode sombre */
+.dark .handsontable .edit-button {
+    color: rgb(156, 163, 175) !important;
 }
 
 .dark .handsontable .edit-button:hover {
-    color: rgb(96 165 250);
+    color: rgb(59, 130, 246) !important;
 }
 
-/* Alignement vertical des cellules */
-.handsontable td {
-    vertical-align: middle !important;
-    line-height: 22px !important;
-    height: 22px !important;
+.dark .handsontable .delete-button {
+    color: rgb(156, 163, 175) !important;
+}
+
+.dark .handsontable .delete-button:hover {
+    color: rgb(239, 68, 68) !important;
+}
+
+/* Style des filtres en mode sombre */
+.dark .handsontable .columnSorting.ascending::after,
+.dark .handsontable .columnSorting.descending::after {
+    color: #ffffff !important;
+}
+
+/* Assurer que les éléments de l'interface utilisateur restent au-dessus de Handsontable */
+:deep(.dialog-overlay),
+:deep(.dialog-content) {
+    z-index: 9999 !important;
 }
 </style>

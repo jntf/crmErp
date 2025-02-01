@@ -14,3 +14,53 @@ export function formatDate(date: string): string {
     }
     return 'en cours'
 }
+
+export function formatPriceHT(price: number): string {
+    return price.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' € HT'
+}
+
+export function formatPriceTTC(price: number): string {
+    return price.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' € TTC'
+}
+
+export function formatKilometers(mileage: number): string {
+    return mileage.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' km'
+}
+
+export function formatKilometerRange(minKm: number, maxKm: number): string {
+    return minKm === maxKm 
+        ? formatKilometers(minKm)
+        : `${formatKilometers(minKm)} - ${formatKilometers(maxKm)}`
+}
+
+export function formatMECDate(date: string): string {
+    const dateObj = new Date(date)
+    return dateObj.toLocaleString('fr-FR', { month: '2-digit', year: 'numeric' })
+}
+
+export interface FormattedFeatures {
+    comfort: string[];
+    exterior: string[];
+    interior: string[];
+    safety: string[];
+}
+
+export function formatFeatures(features: any): FormattedFeatures {
+    if (!features) return {
+        comfort: [],
+        exterior: [],
+        interior: [],
+        safety: []
+    }
+    
+    return {
+        comfort: features.comfort?.map((f: string) => f.trim()) || [],
+        exterior: features.exterior?.map((f: string) => f.trim()) || [],
+        interior: features.interior?.map((f: string) => f.trim()) || [],
+        safety: features.safety?.map((f: string) => f.trim()) || []
+    }
+}
+
+export function formatColorCount(color: string, count: number): string {
+    return `${count} x ${color}`
+}

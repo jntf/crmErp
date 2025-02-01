@@ -23,5 +23,5 @@ logs
 .env.*
 !.env.example
 
-# Supabase
-.supabase
+# Ne pas importer le dossier supabase et ses fichiers
+supabase

@@ -1,73 +1,101 @@
 //components/DataTable/DataTableToolbar.vue
 <template>
-    <div class="flex items-center justify-between pb-4">
-        <div class="flex flex-1 items-center space-x-2">
-            <!-- Search -->
-            <!-- <div class="relative w-64">
-                <input type="text" :placeholder="searchPlaceholder"
-                    class="w-full pl-8 pr-2 py-1 text-sm border rounded-md dark:bg-gray-800 dark:border-gray-700"
-                    v-model="searchValue" @input="handleSearch" />
-                <Search class="absolute left-2 top-1.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
-            </div> -->
-
-            <!-- Selection info -->
-            <div v-if="selectedCount > 0" class="text-sm text-gray-500 dark:text-gray-400">
-                {{ selectedCount }} ligne{{ selectedCount > 1 ? 's' : '' }} sélectionnée{{ selectedCount > 1 ? 's' : ''
-                }}
-            </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="flex items-center space-x-2">
+    <div class="flex items-center relative h-10">
+        <!-- Left floating section -->
+        <div class="absolute -left-12 top-0 flex flex-col space-y-4 h-full py-5">
+            <!-- Column visibility -->
             <Popover class="relative">
                 <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" class="h-8 bg-blue-500 hover:bg-blue-100">
-                        <ViewIcon class="h-4 w-4 text-blue-100 hover:text-blue-500" />
+                    <Button variant="ghost" size="icon" class="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 group">
+                        <div class="relative w-4 h-4">
+                            <!-- Custom column icon -->
+                            <div class="absolute inset-0 flex flex-col justify-between">
+                                <div class="h-[2px] w-full bg-gray-500 dark:bg-gray-400 group-hover:bg-gray-700 dark:group-hover:bg-gray-300 transition-colors"></div>
+                                <div class="h-[2px] w-3/4 bg-gray-500 dark:bg-gray-400 group-hover:bg-gray-700 dark:group-hover:bg-gray-300 transition-colors"></div>
+                                <div class="h-[2px] w-1/2 bg-gray-500 dark:bg-gray-400 group-hover:bg-gray-700 dark:group-hover:bg-gray-300 transition-colors"></div>
+                            </div>
+                        </div>
+                        <span class="sr-only">Gérer les colonnes</span>
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent class="w-80 p-0 mt-14" align="start">
-                    <Command>
-                        <CommandInput placeholder="Rechercher une colonne..." />
+                <PopoverContent class="w-64 p-0" align="start">
+                    <Command class="border-none">
+                        <CommandInput placeholder="Rechercher une colonne..." class="h-9" />
                         <CommandList>
                             <CommandEmpty>Aucune colonne trouvée.</CommandEmpty>
                             <CommandGroup>
-                                <CommandItem v-for="column in columns" :key="column.data" 
+                                <CommandItem
+                                    v-for="column in columns"
+                                    :key="column.data"
                                     :value="column.data"
-                                    :disabled="column.required">
-                                    <Checkbox :id="column.data" :checked="isColumnVisible(column)"
-                                        @update:checked="toggleColumn(column)" class="mr-2" />
-                                    {{ column.title }}
+                                    :disabled="column.required"
+                                    class="flex items-center space-x-2 px-2 py-1.5"
+                                >
+                                    <Checkbox
+                                        :id="column.data"
+                                        :checked="isColumnVisible(column)"
+                                        @update:checked="toggleColumn(column)"
+                                        class="h-4 w-4"
+                                    />
+                                    <span class="text-sm">{{ column.title }}</span>
                                 </CommandItem>
                             </CommandGroup>
                         </CommandList>
                     </Command>
                 </PopoverContent>
             </Popover>
+
             <!-- Export -->
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" class="ml-auto">
-                        <Download class="mr-2 h-4 w-4" />
+                    <Button variant="ghost" size="icon" class="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800">
+                        <Download class="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        <span class="sr-only">Exporter</span>
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" class="mt-14">
-                    <DropdownMenuItem @click="handleExportClick('csv')">
-                        Export CSV
+                <DropdownMenuContent align="start" class="w-48">
+                    <DropdownMenuItem @click="handleExportClick('csv')" class="flex items-center">
+                        <FileText class="h-4 w-4 mr-2" />
+                        <span>Exporter en CSV</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem @click="handleExportClick('xlsx')">
-                        Export Excel
+                    <DropdownMenuItem @click="handleExportClick('xlsx')" class="flex items-center">
+                        <Table class="h-4 w-4 mr-2" />
+                        <span>Exporter en Excel</span>
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
+        </div>
 
-            <slot name="actions"></slot>
+        <!-- Main toolbar content -->
+        <div class="flex items-center justify-between w-full border-b border-gray-200 dark:border-gray-800 px-4">
+            <!-- Selection info with animation -->
+            <TransitionRoot
+                :show="selectedCount > 0"
+                enter="transition ease-out duration-200"
+                enterFrom="opacity-0 -translate-x-2"
+                enterTo="opacity-100 translate-x-0"
+                leave="transition ease-in duration-150"
+                leaveFrom="opacity-100 translate-x-0"
+                leaveTo="opacity-0 -translate-x-2"
+            >
+                <div v-if="selectedCount > 0" 
+                    class="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md">
+                    {{ selectedCount }} sélectionné{{ selectedCount > 1 ? 's' : '' }}
+                </div>
+            </TransitionRoot>
+
+            <!-- Right section for custom actions -->
+            <div class="flex items-center">
+                <slot name="actions"></slot>
+            </div>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Search, ViewIcon, Download } from 'lucide-vue-next'
+import { Download, FileText, Table } from 'lucide-vue-next'
+import { TransitionRoot } from '@headlessui/vue'
 import { Button } from '@/components/ui/button'
 import {
     Popover,
@@ -90,40 +118,48 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Checkbox } from '@/components/ui/checkbox'
 
+interface Column {
+    data: string
+    title: string
+    required?: boolean
+}
+
 interface Props {
-    columns: any[]
-    searchPlaceholder?: string
+    columns: Column[]
     selectedCount: number
     visibleColumns: string[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    searchPlaceholder: 'Rechercher...',
     selectedCount: 0
 })
 
 const emit = defineEmits<{
-    'search': [value: string]
     'toggleColumn': [column: string]
     'export': [format: string]
 }>()
 
-const searchValue = ref('')
-
-const handleSearch = () => {
-    emit('search', searchValue.value)
-}
-
-const isColumnVisible = (column) => {
+const isColumnVisible = (column: Column): boolean => {
     return props.visibleColumns.includes(column.data)
 }
 
-const toggleColumn = (column) => {
+const toggleColumn = (column: Column): void => {
     emit('toggleColumn', column.data)
 }
 
-const handleExportClick = (format: 'csv' | 'xlsx') => {
-    console.log('Export clicked:', format)
+const handleExportClick = (format: 'csv' | 'xlsx'): void => {
     emit('export', format)
 }
 </script>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
+</style>
