@@ -28,7 +28,7 @@ import { MapPin, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyBSBxQ2CTpZPwJKZRKIl_KPZSfA85iQM-Q'
+const GOOGLE_MAPS_API_KEY = useRuntimeConfig().public.GOOGLE_MAPS_API_KEY
 
 const props = defineProps({
     addresses: {
