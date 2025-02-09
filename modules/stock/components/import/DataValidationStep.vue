@@ -145,6 +145,8 @@ import { VehicleStatusEnum } from '../../types'
 import type { Supplier } from '../../types'
 import { useToast } from '@/components/ui/toast/use-toast'
 import { Label } from '@/components/ui/label'
+import { format, parse } from 'date-fns'
+import { fr } from 'date-fns/locale'
 
 interface Country {
     id: number
@@ -209,26 +211,26 @@ const displayFields = [
     { key: 'version', label: 'Version', width: 'min-w-[150px]', placeholder: 'Version' },
     { key: 'vin', label: 'VIN', width: 'min-w-[130px]', placeholder: 'Numéro VIN' },
     { key: 'registration_number', label: 'Immat.', width: 'min-w-[80px]', placeholder: 'XX-123-XX' },
-    { key: 'registration_date', label: 'Date Immat.', width: 'min-w-[100px]', placeholder: 'JJ/MM/AAAA' },
+    { key: 'registration_date', label: 'Date Immat.', width: 'min-w-[100px]', placeholder: 'JJ/MM/AAAA', type: 'date' },
 
     // Caractéristiques techniques
-    { key: 'year', label: 'Année', width: 'min-w-[60px]', placeholder: 'AAAA' },
-    { key: 'mileage', label: 'Km', width: 'min-w-[80px]', placeholder: 'Kilométrage' },
+    { key: 'year', label: 'Année', width: 'min-w-[60px]', placeholder: 'AAAA', type: 'number' },
+    { key: 'mileage', label: 'Km', width: 'min-w-[80px]', placeholder: 'Kilométrage', type: 'number' },
     { key: 'fuel_type', label: 'Carb.', width: 'min-w-[80px]', placeholder: 'Carburant' },
     { key: 'transmission', label: 'Boîte', width: 'min-w-[80px]', placeholder: 'Boîte' },
     { key: 'color', label: 'Couleur', width: 'min-w-[80px]', placeholder: 'Couleur' },
-    { key: 'co2_emissions', label: 'CO2', width: 'min-w-[60px]', placeholder: 'g/km' },
-    { key: 'power_hp', label: 'Ch', width: 'min-w-[60px]', placeholder: 'ch' },
-    { key: 'power_fiscal', label: 'CV', width: 'min-w-[50px]', placeholder: 'cv' },
-    { key: 'doors', label: 'Portes', width: 'min-w-[60px]', placeholder: 'Nb' },
-    { key: 'seats', label: 'Places', width: 'min-w-[60px]', placeholder: 'Nb' },
+    { key: 'co2_emissions', label: 'CO2', width: 'min-w-[60px]', placeholder: 'g/km', type: 'number' },
+    { key: 'power_hp', label: 'Ch', width: 'min-w-[60px]', placeholder: 'ch', type: 'number' },
+    { key: 'power_fiscal', label: 'CV', width: 'min-w-[50px]', placeholder: 'cv', type: 'number' },
+    { key: 'doors', label: 'Portes', width: 'min-w-[60px]', placeholder: 'Nb', type: 'number' },
+    { key: 'seats', label: 'Places', width: 'min-w-[60px]', placeholder: 'Nb', type: 'number' },
 
     // Prix et coûts
-    { key: 'vehicle_price_ht', label: 'Prix HT', width: 'min-w-[90px]', placeholder: 'Prix HT' },
-    { key: 'vehicle_selling_price_ht', label: 'Prix Vente', width: 'min-w-[90px]', placeholder: 'Prix Vente HT' },
-    { key: 'vehicle_repair_cost', label: 'Frais Rép.', width: 'min-w-[80px]', placeholder: 'Frais' },
-    { key: 'vehicle_frevo', label: 'FREVO', width: 'min-w-[80px]', placeholder: 'FREVO' },
-    { key: 'vehicle_vat_rate', label: 'TVA', width: 'min-w-[60px]', placeholder: '%' },
+    { key: 'vehicle_price_ht', label: 'Prix HT', width: 'min-w-[90px]', placeholder: 'Prix HT', type: 'number' },
+    { key: 'vehicle_selling_price_ht', label: 'Prix Vente', width: 'min-w-[90px]', placeholder: 'Prix Vente HT', type: 'number' },
+    { key: 'vehicle_repair_cost', label: 'Frais Rép.', width: 'min-w-[80px]', placeholder: 'Frais', type: 'number' },
+    { key: 'vehicle_frevo', label: 'FREVO', width: 'min-w-[80px]', placeholder: 'FREVO', type: 'number' },
+    { key: 'vehicle_vat_rate', label: 'TVA', width: 'min-w-[60px]', placeholder: '%', type: 'number' },
 
     // Localisation
     { key: 'vehicle_location', label: 'Lieu', width: 'min-w-[100px]', placeholder: 'Localisation' },
@@ -276,14 +278,12 @@ const bulkEditFields = [
     { value: 'power_fiscal', label: 'CV' },
     { value: 'doors', label: 'Portes' },
     { value: 'seats', label: 'Places' },
-
     // Prix et coûts
     { value: 'vehicle_price_ht', label: 'Prix HT' },
     { value: 'vehicle_selling_price_ht', label: 'Prix Vente HT' },
     { value: 'vehicle_repair_cost', label: 'Frais Réparation' },
     { value: 'vehicle_frevo', label: 'FREVO' },
     { value: 'vehicle_vat_rate', label: 'TVA' },
-
     // Localisation
     { value: 'vehicle_location', label: 'Lieu' },
     { value: 'country_id', label: 'Pays' }
@@ -355,28 +355,58 @@ const handleValidationComplete = () => {
     
     const validatedData = {
         data: localData.value.map(row => {
-            const updatedRow = {
-                ...row,
-                status: selectedStatus.value,
-                details: {
-                    status_details: {
-                        status: selectedStatus.value,
-                        location: row.vehicle_location || '',
-                        is_online: false,
-                        exposed_id: null
-                    },
-                    ownership: selectedSupplier.value ? [{
-                        company_id: parseInt(selectedSupplier.value.id),
-                        ownership_type: 'supplier',
-                        start_date: new Date().toISOString(),
-                        is_primary: true,
-                        notes: '',
-                        created_by: 'system',
-                        updated_by: 'system'
-                    }] : []
+            // Fonction pour formater la date
+            const formatDate = (dateStr: string) => {
+                if (!dateStr) return null
+                try {
+                    // Parse la date au format DD/MM/YYYY
+                    const parsedDate = parse(dateStr, 'dd/MM/yyyy', new Date())
+                    // Retourne au format YYYY-MM-DD
+                    return format(parsedDate, 'yyyy-MM-dd')
+                } catch (error) {
+                    console.error('Erreur de parsing de date:', error)
+                    return null
                 }
             }
-            console.log('Ligne validée:', updatedRow)
+
+            // Construction des détails du véhicule
+            const details = {
+                status_details: {
+                    status: selectedStatus.value,
+                    location: row.vehicle_location || '',
+                    is_online: false,
+                    exposed_id: null
+                },
+                price_details: {
+                    purchase_price_ht: parseFloat(row.vehicle_price_ht) || 0,
+                    selling_price_ht: parseFloat(row.vehicle_selling_price_ht) || 0,
+                    vat_rate: parseFloat(row.vehicle_vat_rate) || 20,
+                    repair_cost: parseFloat(row.vehicle_repair_cost) || 0,
+                    frevo: parseFloat(row.vehicle_frevo) || 0
+                },
+                ownership: selectedSupplier.value ? [{
+                    company_id: parseInt(selectedSupplier.value.id),
+                    ownership_type: 'supplier',
+                    start_date: new Date().toISOString(),
+                    is_primary: true,
+                    notes: '',
+                    created_by: 'system',
+                    updated_by: 'system'
+                }] : []
+            }
+
+            console.log('Détails du prix:', details.price_details)
+            console.log('Détails du statut:', details.status_details)
+            console.log('Données brutes de la ligne:', row)
+
+            const updatedRow = {
+                ...row,
+                registration_date: formatDate(row.registration_date),
+                status: selectedStatus.value,
+                details
+            }
+
+            console.log('Ligne validée complète:', updatedRow)
             return updatedRow
         }),
         supplier: selectedSupplier.value

@@ -10,20 +10,20 @@
 
             <div class="flex gap-6 py-6">
                 <!-- Sidebar avec les switches -->
-                <div class="w-64 space-y-6">
+                <div class="w-64 space-y-4 max-h-[600px] overflow-y-auto pr-2">
                     <Card>
-                        <CardHeader>
-                            <CardTitle class="text-sm">Options d'affichage</CardTitle>
+                        <CardHeader class="py-3">
+                            <CardTitle class="text-xs">Options d'affichage</CardTitle>
                         </CardHeader>
-                        <CardContent class="space-y-4">
+                        <CardContent class="space-y-3">
                             <FormField v-slot="{ value, handleChange }" name="showVIN">
                                 <FormItem class="flex items-center justify-between">
-                                    <FormLabel class="text-sm">Numéro VIN</FormLabel>
+                                    <FormLabel class="text-xs">Numéro VIN</FormLabel>
                                     <FormControl>
                                         <Switch
                                             :checked="value"
                                             @update:checked="handleChange"
-                                            class="scale-75 origin-left"
+                                            class="scale-65 origin-left"
                                         />
                                     </FormControl>
                                 </FormItem>
@@ -31,12 +31,12 @@
 
                             <FormField v-slot="{ value, handleChange }" name="showFrevo">
                                 <FormItem class="flex items-center justify-between">
-                                    <FormLabel class="text-sm">Frais VO</FormLabel>
+                                    <FormLabel class="text-xs">Frais VO</FormLabel>
                                     <FormControl>
                                         <Switch
                                             :checked="value"
                                             @update:checked="handleChange"
-                                            class="scale-75 origin-left"
+                                            class="scale-65 origin-left"
                                         />
                                     </FormControl>
                                 </FormItem>
@@ -44,12 +44,12 @@
 
                             <FormField v-slot="{ value, handleChange }" name="showEquipment">
                                 <FormItem class="flex items-center justify-between">
-                                    <FormLabel class="text-sm">Équipements</FormLabel>
+                                    <FormLabel class="text-xs">Équipements</FormLabel>
                                     <FormControl>
                                         <Switch
                                             :checked="value"
                                             @update:checked="handleChange"
-                                            class="scale-75 origin-left"
+                                            class="scale-65 origin-left"
                                         />
                                     </FormControl>
                                 </FormItem>
@@ -57,12 +57,12 @@
 
                             <FormField v-slot="{ value, handleChange }" name="showColor">
                                 <FormItem class="flex items-center justify-between">
-                                    <FormLabel class="text-sm">Couleur</FormLabel>
+                                    <FormLabel class="text-xs">Couleur</FormLabel>
                                     <FormControl>
                                         <Switch
                                             :checked="value"
                                             @update:checked="handleChange"
-                                            class="scale-75 origin-left"
+                                            class="scale-65 origin-left"
                                         />
                                     </FormControl>
                                 </FormItem>
@@ -70,12 +70,12 @@
 
                             <FormField v-slot="{ value, handleChange }" name="showMEC">
                                 <FormItem class="flex items-center justify-between">
-                                    <FormLabel class="text-sm">Date MEC</FormLabel>
+                                    <FormLabel class="text-xs">Date MEC</FormLabel>
                                     <FormControl>
                                         <Switch
                                             :checked="value"
                                             @update:checked="handleChange"
-                                            class="scale-75 origin-left"
+                                            class="scale-65 origin-left"
                                         />
                                     </FormControl>
                                 </FormItem>
@@ -84,59 +84,131 @@
                     </Card>
 
                     <Card>
-                        <CardHeader>
-                            <CardTitle class="text-sm">Options de prix</CardTitle>
+                        <CardHeader class="py-3">
+                            <CardTitle class="text-xs">Options de prix</CardTitle>
+                            <CardDescription class="text-xs">Prix de référence : Prix camion</CardDescription>
                         </CardHeader>
-                        <CardContent class="space-y-4">
-                            <FormField v-slot="{ value, handleChange }" name="showPriceUnit">
+                        <CardContent class="space-y-3">
+                            <!-- Type de différence -->
+                            <FormField v-slot="{ value, handleChange }" name="isDiffPercent">
                                 <FormItem class="flex items-center justify-between">
-                                    <FormLabel class="text-sm">Prix unitaire</FormLabel>
+                                    <FormLabel class="text-xs">Différence en pourcentage</FormLabel>
                                     <FormControl>
                                         <Switch
                                             :checked="value"
                                             @update:checked="handleChange"
-                                            class="scale-75 origin-left"
+                                            class="scale-65 origin-left"
                                         />
                                     </FormControl>
                                 </FormItem>
                             </FormField>
 
-                            <FormField v-slot="{ value, handleChange }" name="showPrice2Units">
-                                <FormItem class="flex items-center justify-between">
-                                    <FormLabel class="text-sm">Prix 2 unités</FormLabel>
-                                    <FormControl>
-                                        <Switch
-                                            :checked="value"
-                                            @update:checked="handleChange"
-                                            class="scale-75 origin-left"
-                                        />
-                                    </FormControl>
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ value, handleChange }" name="showPrice4Units">
-                                <FormItem class="flex items-center justify-between">
-                                    <FormLabel class="text-sm">Prix 4 unités</FormLabel>
-                                    <FormControl>
-                                        <Switch
-                                            :checked="value"
-                                            @update:checked="handleChange"
-                                            class="scale-75 origin-left"
-                                        />
-                                    </FormControl>
-                                </FormItem>
-                            </FormField>
-
+                            <!-- Prix camion (référence) -->
                             <FormField v-slot="{ value, handleChange }" name="showPriceTruck">
-                                <FormItem class="flex items-center justify-between">
-                                    <FormLabel class="text-sm">Prix camion</FormLabel>
-                                    <FormControl>
-                                        <Switch
-                                            :checked="value"
-                                            @update:checked="handleChange"
-                                            class="scale-75 origin-left"
+                                <FormItem class="flex flex-col gap-1.5">
+                                    <div class="flex items-center justify-between">
+                                        <FormLabel class="text-xs">Prix camion (référence)</FormLabel>
+                                        <FormControl>
+                                            <Switch
+                                                :checked="value"
+                                                @update:checked="handleChange"
+                                                class="scale-65 origin-left"
+                                            />
+                                        </FormControl>
+                                    </div>
+                                    <div v-if="value" class="flex items-center gap-2">
+                                        <Input 
+                                            v-model="priceSettings.truck"
+                                            type="number"
+                                            class="w-24 h-7 text-xs"
+                                            placeholder="Prix HT"
                                         />
-                                    </FormControl>
+                                        <span class="text-xs text-muted-foreground">€ HT</span>
+                                    </div>
+                                </FormItem>
+                            </FormField>
+
+                            <!-- Prix 4 unités -->
+                            <FormField v-slot="{ value, handleChange }" name="showPrice4Units">
+                                <FormItem class="flex flex-col gap-1.5">
+                                    <div class="flex items-center justify-between">
+                                        <FormLabel class="text-xs">Prix 4 unités</FormLabel>
+                                        <FormControl>
+                                            <Switch
+                                                :checked="value"
+                                                @update:checked="handleChange"
+                                                class="scale-65 origin-left"
+                                            />
+                                        </FormControl>
+                                    </div>
+                                    <div v-if="value" class="flex items-center gap-2">
+                                        <Input 
+                                            v-model="priceSettings.fourUnitsDiff"
+                                            type="number"
+                                            class="w-24 h-7 text-xs"
+                                            :placeholder="options.isDiffPercent ? '% en plus' : '€ en plus'"
+                                        />
+                                        <span class="text-xs text-muted-foreground">{{ options.isDiffPercent ? '%' : '€' }}</span>
+                                        <span class="text-xs text-muted-foreground ml-1">
+                                            = {{ formatPrice(calculatePrice(priceSettings.truck, 1)) }} € HT
+                                        </span>
+                                    </div>
+                                </FormItem>
+                            </FormField>
+
+                            <!-- Prix 2 unités -->
+                            <FormField v-slot="{ value, handleChange }" name="showPrice2Units">
+                                <FormItem class="flex flex-col gap-1.5">
+                                    <div class="flex items-center justify-between">
+                                        <FormLabel class="text-xs">Prix 2 unités</FormLabel>
+                                        <FormControl>
+                                            <Switch
+                                                :checked="value"
+                                                @update:checked="handleChange"
+                                                class="scale-15 origin-left"
+                                            />
+                                        </FormControl>
+                                    </div>
+                                    <div v-if="value" class="flex items-center gap-2">
+                                        <Input 
+                                            v-model="priceSettings.twoUnitsDiff"
+                                            type="number"
+                                            class="w-24 h-7 text-xs"
+                                            :placeholder="options.isDiffPercent ? '% en plus' : '€ en plus'"
+                                        />
+                                        <span class="text-xs text-muted-foreground">{{ options.isDiffPercent ? '%' : '€' }}</span>
+                                        <span class="text-xs text-muted-foreground ml-1">
+                                            = {{ formatPrice(calculatePrice(priceSettings.truck, 2)) }} € HT
+                                        </span>
+                                    </div>
+                                </FormItem>
+                            </FormField>
+
+                            <!-- Prix unitaire -->
+                            <FormField v-slot="{ value, handleChange }" name="showPriceUnit">
+                                <FormItem class="flex flex-col gap-1.5">
+                                    <div class="flex items-center justify-between">
+                                        <FormLabel class="text-xs">Prix unitaire</FormLabel>
+                                        <FormControl>
+                                            <Switch
+                                                :checked="value"
+                                                @update:checked="handleChange"
+                                                class="scale-65 origin-left"
+                                            />
+                                        </FormControl>
+                                    </div>
+                                    <div v-if="value" class="flex items-center gap-2">
+                                        <Input 
+                                            v-model="priceSettings.unitDiff"
+                                            type="number"
+                                            class="w-24 h-7 text-xs"
+                                            :placeholder="options.isDiffPercent ? '% en plus' : '€ en plus'"
+                                        />
+                                        <span class="text-xs text-muted-foreground">{{ options.isDiffPercent ? '%' : '€' }}</span>
+                                        <span class="text-xs text-muted-foreground ml-1">
+                                            = {{ formatPrice(calculatePrice(priceSettings.truck, 3)) }} € HT
+                                        </span>
+                                    </div>
                                 </FormItem>
                             </FormField>
                         </CardContent>
@@ -164,9 +236,9 @@
                                 <h3 class="text-xl font-bold uppercase mb-4">{{ formatTitleGroupTitle(titleKey) }}</h3>
                                 <div v-for="(priceGroup, priceKey) in titleGroup" :key="priceKey" 
                                     class="bg-muted p-4 rounded-lg mb-4">
-                                    <div v-if="priceGroup.length > 1" class="mb-4">
+                                    <!-- <div v-if="priceGroup.length > 1" class="mb-4">
                                         <p class="text-lg font-semibold text-center">Option {{ getOptionNumber(titleGroup, priceKey) }}</p>
-                                    </div>
+                                    </div> -->
                                     
                                     <!-- Informations véhicule -->
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -217,7 +289,7 @@
                                             </span>
                                         </p>
                                         <p v-if="options.showPriceTruck" class="flex justify-between items-center py-1">
-                                            <span class="font-semibold">À partir de 8 unités :</span>
+                                            <span class="font-semibold">Prix camion :</span>
                                             <span>
                                                 {{ formatPrice(calculatePrice(priceKey, 0)) }} HT
                                                 <span class="text-muted-foreground">({{ formatPrice(calculatePrice(priceKey, 0) * 1.2) }} TTC)</span>
@@ -243,15 +315,15 @@
                                                 <span class="text-sm">{{ findCommonEquipment(priceGroup).comfort.join(', ') }}</span></p>
                                             </div>
                                             <div v-if="findCommonEquipment(priceGroup).exterior.length > 0">
-                                                <p class="font-medium text-sm text-muted-foreground">Extérieur : 
+                                                <p class="font-medium text-sm text-muted-foreground">Extérieur :
                                                 <span class="text-sm">{{ findCommonEquipment(priceGroup).exterior.join(', ') }}</span></p>
                                             </div>
                                             <div v-if="findCommonEquipment(priceGroup).interior.length > 0">
-                                                <p class="font-medium text-sm text-muted-foreground">Intérieur : 
+                                                <p class="font-medium text-sm text-muted-foreground">Intérieur :
                                                 <span class="text-sm">{{ findCommonEquipment(priceGroup).interior.join(', ') }}</span></p>
                                             </div>
                                             <div v-if="findCommonEquipment(priceGroup).safety.length > 0">
-                                                <p class="font-medium text-sm text-muted-foreground">Sécurité : 
+                                                <p class="font-medium text-sm text-muted-foreground">Sécurité :
                                                 <span class="text-sm">{{ findCommonEquipment(priceGroup).safety.join(', ') }}</span></p>
                                             </div>
                                         </div>
@@ -298,7 +370,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ClipboardCopy, Mail } from 'lucide-vue-next'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -314,9 +386,9 @@ import { toTypedSchema } from '@vee-validate/zod'
 import { useForm } from 'vee-validate'
 import * as z from 'zod'
 
-interface FormattedFeatures {
-    options: string[]
+interface Equipment {
     serie: string[]
+    options: string[]
     comfort: string[]
     exterior: string[]
     interior: string[]
@@ -328,13 +400,32 @@ const props = defineProps<{
     selectedVehicles: any[]
 }>()
 
-console.log("véhicules", props.selectedVehicles)
-
 const emit = defineEmits<{
     'update:modelValue': [value: boolean]
 }>()
 
 const { toast } = useToast()
+
+// État pour les prix personnalisés
+const priceSettings = ref({
+    truck: 0, // Prix de référence
+    unitDiff: 3, // +3% ou +500€
+    twoUnitsDiff: 2, // +2% ou +300€
+    fourUnitsDiff: 1, // +1% ou +100€
+})
+
+// Initialisation des prix par défaut
+watch(() => props.selectedVehicles, (newVehicles) => {
+    if (newVehicles.length > 0) {
+        const basePrice = newVehicles[0].details?.price_details?.selling_price_ht || 0
+        priceSettings.value = {
+            truck: Math.ceil(basePrice / 10) * 10,
+            unitDiff: 3,
+            twoUnitsDiff: 2,
+            fourUnitsDiff: 1
+        }
+    }
+}, { immediate: true })
 
 // Schéma de validation pour les options
 const formSchema = toTypedSchema(z.object({
@@ -346,7 +437,8 @@ const formSchema = toTypedSchema(z.object({
     showPriceUnit: z.boolean().default(true),
     showPrice2Units: z.boolean().default(true),
     showPrice4Units: z.boolean().default(true),
-    showPriceTruck: z.boolean().default(true)
+    showPriceTruck: z.boolean().default(true),
+    isDiffPercent: z.boolean().default(true)
 }))
 
 // Initialisation du formulaire avec vee-validate
@@ -431,39 +523,70 @@ const formatColors = (group: any[]) => {
 }
 
 const calculatePrice = (basePrice: number, tier: number) => {
-    const discount = tier * 0.01 // 1% de réduction par palier
-    const priceWithDiscount = basePrice * (1 + discount)
-    return Math.ceil(priceWithDiscount / 10) * 10 // Arrondit à la dizaine supérieure
+    const truckPrice = priceSettings.value.truck
+    if (!truckPrice) return basePrice
+
+    switch(tier) {
+        case 3: // Prix unitaire
+            return options.isDiffPercent
+                ? Math.ceil(truckPrice * (1 + priceSettings.value.unitDiff / 100) / 10) * 10
+                : Math.ceil((truckPrice + priceSettings.value.unitDiff) / 10) * 10
+        case 2: // Prix 2 unités
+            return options.isDiffPercent
+                ? Math.ceil(truckPrice * (1 + priceSettings.value.twoUnitsDiff / 100) / 10) * 10
+                : Math.ceil((truckPrice + priceSettings.value.twoUnitsDiff) / 10) * 10
+        case 1: // Prix 4 unités
+            return options.isDiffPercent
+                ? Math.ceil(truckPrice * (1 + priceSettings.value.fourUnitsDiff / 100) / 10) * 10
+                : Math.ceil((truckPrice + priceSettings.value.fourUnitsDiff) / 10) * 10
+        case 0: // Prix camion
+            return truckPrice
+        default:
+            return basePrice
+    }
 }
 
 const findCommonEquipment = (group: any[]) => {
     if (!group || group.length === 0) return {
-        options: [],
-        serie: [],
-        comfort: [],
-        exterior: [],
-        interior: [],
-        safety: []
-    } as FormattedFeatures
+        options: [] as string[],
+        serie: [] as string[],
+        comfort: [] as string[],
+        exterior: [] as string[],
+        interior: [] as string[],
+        safety: [] as string[]
+    }
     
     try {
-        const allEquipment = group.map(vehicle => formatFeatures(vehicle.details.features)) as FormattedFeatures[]
+        // Récupérer les équipements de tous les véhicules
+        const allEquipment = group.map(vehicle => {
+            const features = vehicle.details?.features || {}
+            return {
+                serie: features.serie || [],
+                options: features.options || [],
+                comfort: features.comfort || [],
+                exterior: features.exterior || [],
+                interior: features.interior || [],
+                safety: features.safety || []
+            }
+        }) as Equipment[]
+
         if (allEquipment.length === 0) {
             return {
-                options: [],
-                serie: [],
-                comfort: [],
-                exterior: [],
-                interior: [],
-                safety: []
-            } as FormattedFeatures
+                options: [] as string[],
+                serie: [] as string[],
+                comfort: [] as string[],
+                exterior: [] as string[],
+                interior: [] as string[],
+                safety: [] as string[]
+            }
         }
 
         // Fonction pour trouver les équipements communs dans une catégorie
-        const findCommonInCategory = (category: 'options' | 'serie' | 'comfort' | 'exterior' | 'interior' | 'safety') => {
-            return allEquipment.reduce((common, current) => 
-                common.filter(item => current[category].includes(item)),
-                allEquipment[0][category]
+        const findCommonInCategory = (category: keyof Equipment) => {
+            if (!allEquipment[0][category]) return []
+            return allEquipment.reduce((common: string[], current: Equipment) => 
+                common.filter((item: string) => current[category].includes(item)),
+                [...allEquipment[0][category]]
             )
         }
 
@@ -474,28 +597,23 @@ const findCommonEquipment = (group: any[]) => {
             exterior: findCommonInCategory('exterior'),
             interior: findCommonInCategory('interior'),
             safety: findCommonInCategory('safety')
-        } as FormattedFeatures
+        }
     } catch (error) {
         console.error('Erreur dans findCommonEquipment:', error)
         return {
-            options: [],
-            serie: [],
-            comfort: [],
-            exterior: [],
-            interior: [],
-            safety: []
-        } as FormattedFeatures
+            options: [] as string[],
+            serie: [] as string[],
+            comfort: [] as string[],
+            exterior: [] as string[],
+            interior: [] as string[],
+            safety: [] as string[]
+        }
     }
 }
 
 const hasEquipments = (group: any[]) => {
     const equipment = findCommonEquipment(group)
-    return equipment.options.length > 0 || 
-           equipment.serie.length > 0 || 
-           equipment.comfort.length > 0 || 
-           equipment.exterior.length > 0 || 
-           equipment.interior.length > 0 || 
-           equipment.safety.length > 0
+    return Object.values(equipment).some(array => array && array.length > 0)
 }
 
 const generateEmailSubject = () => {
@@ -510,9 +628,127 @@ const generateEmailSubject = () => {
     return `OFFRE - ${brandText} - ${kmType}${year}`
 }
 
+// Fonction pour générer le contenu compatible email
+const generateEmailContent = () => {
+    const styles = `
+        <style>
+            .offer-container { font-family: Arial, sans-serif; color: #333; }
+            .vehicle-group { margin-bottom: 30px; }
+            .vehicle-title { font-size: 18px; font-weight: bold; text-transform: uppercase; margin-bottom: 13px; color: #1a1a1a; }
+            .vehicle-block { padding: 13px; border-radius: 8px; margin-bottom: 13px; }
+            .info-grid { display: table; width: 100%; margin-bottom: 13px; }
+            .info-col { display: table-cell; width: 50%; vertical-align: top; padding: 5px 13px 5px 0; }
+            .info-label { font-weight: bold; color: #1a1a1a; }
+            .price-row { display: flex; justify-content: space-between; padding: 5px 0; }
+            .price-label { font-weight: bold; }
+            .price-value { text-align: right; }
+            .price-ttc { color: #666; }
+            .equipment-section { border-top: 1px solid #ddd; margin-top: 13px; padding-top: 13px; }
+            .equipment-title { font-weight: bold; margin-bottom: 10px; }
+            .equipment-category { margin-bottom: 8px; }
+            .equipment-label { color: #666; font-weight: 500; }
+        </style>
+    `
+
+    let content = `<div class="offer-container">`
+
+    // Parcourir les groupes de véhicules
+    Object.entries(groupedVehicles.value).forEach(([titleKey, titleGroup]) => {
+        content += `
+            <div class="vehicle-group">
+                <div class="vehicle-title">${formatTitleGroupTitle(titleKey)}</div>
+        `
+
+        Object.entries(titleGroup as Record<string, any[]>).forEach(([priceKey, priceGroup]) => {
+            const numericPriceKey = Number(priceKey)
+            content += `
+                <div class="vehicle-block">
+                    <div class="info-grid">
+                        <div class="info-col">
+                            <div><span class="info-label">Kilométrage :</span> ${formatKilometers(priceGroup)}</div>
+                            ${options.showColor ? `
+                                <div><span class="info-label">${priceGroup.length > 1 ? 'Couleurs :' : 'Couleur :'}</span> ${formatColors(priceGroup)}</div>
+                            ` : ''}
+                            ${options.showMEC ? `
+                                <div><span class="info-label">Mise en circulation :</span> ${formatMEC(priceGroup)}</div>
+                            ` : ''}
+                        </div>
+                        <div class="info-col">
+                            ${options.showFrevo && priceGroup[0]?.details?.price_details?.frevo > 0 ? `
+                                <div><span class="info-label">Frevo :</span> ${formatFrevo(priceGroup)} € HT</div>
+                            ` : ''}
+                            ${options.showVIN && priceGroup[0]?.vin ? `
+                                <div><span class="info-label">VIN (exemple) :</span> ${priceGroup[0].vin}</div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <div class="price-section">
+                        ${options.showPriceUnit ? `
+                            <div class="price-row">
+                                <span class="price-label">Prix à l'unité :</span>
+                                <span class="price-value">
+                                    ${formatPrice(calculatePrice(numericPriceKey, 3))} € HT
+                                    <span class="price-ttc">(${formatPrice(calculatePrice(numericPriceKey, 3) * 1.2)} € TTC)</span>
+                                </span>
+                            </div>
+                        ` : ''}
+                        ${options.showPrice2Units ? `
+                            <div class="price-row">
+                                <span class="price-label">À partir de 2 unités :</span>
+                                <span class="price-value">
+                                    ${formatPrice(calculatePrice(numericPriceKey, 2))} € HT
+                                    <span class="price-ttc">(${formatPrice(calculatePrice(numericPriceKey, 2) * 1.2)} € TTC)</span>
+                                </span>
+                            </div>
+                        ` : ''}
+                        ${options.showPrice4Units ? `
+                            <div class="price-row">
+                                <span class="price-label">À partir de 4 unités :</span>
+                                <span class="price-value">
+                                    ${formatPrice(calculatePrice(numericPriceKey, 1))} € HT
+                                    <span class="price-ttc">(${formatPrice(calculatePrice(numericPriceKey, 1) * 1.2)} € TTC)</span>
+                                </span>
+                            </div>
+                        ` : ''}
+                        ${options.showPriceTruck ? `
+                            <div class="price-row">
+                                <span class="price-label">Prix camion :</span>
+                                <span class="price-value">
+                                    ${formatPrice(calculatePrice(numericPriceKey, 0))} € HT
+                                    <span class="price-ttc">(${formatPrice(calculatePrice(numericPriceKey, 0) * 1.2)} € TTC)</span>
+                                </span>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    ${options.showEquipment && hasEquipments(priceGroup) ? `
+                        <div class="equipment-section">
+                            <div class="equipment-title">Équipements :</div>
+                            ${Object.entries(findCommonEquipment(priceGroup)).map(([category, items]) => 
+                                items.length > 0 ? `
+                                    <div class="equipment-category">
+                                        <span class="equipment-label">${category.charAt(0).toUpperCase() + category.slice(1)} :</span>
+                                        ${items.join(', ')}
+                                    </div>
+                                ` : ''
+                            ).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `
+        })
+
+        content += `</div>`
+    })
+
+    content += `</div>`
+    return styles + content
+}
+
 // Actions
 const copyToClipboard = async () => {
-    const content = document.getElementById('offerContent')?.innerHTML
+    const content = generateEmailContent()
     if (!content) return
 
     try {

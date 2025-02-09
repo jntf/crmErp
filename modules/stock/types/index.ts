@@ -90,11 +90,19 @@ export interface VehicleStatusCreate {
 export interface VehicleFeatures {
   id: string
   vehicle_id: string
-  features: Record<string, any>
+  features: {
+    serie?: string[]
+    options?: string[]
+    [key: string]: any
+  }
 }
 
 export interface VehicleFeaturesCreate {
-  features: Record<string, any>
+  features: {
+    serie?: string[]
+    options?: string[]
+    [key: string]: any
+  }
 }
 
 interface VehicleOwnershipCompany {

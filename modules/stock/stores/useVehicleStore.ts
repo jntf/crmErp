@@ -13,7 +13,6 @@ export const useVehicleStore = defineStore('vehicle', () => {
         
         if (error) throw error
 
-        // Les données sont dans data.results
         vehicles.value = data.results.map((vehicle: any) => ({
             ...vehicle,
             details: {
@@ -38,7 +37,6 @@ export const useVehicleStore = defineStore('vehicle', () => {
 
     const createVehicle = async (vehicle: VehicleCreate) => {
         try {
-            // Préparer les données pour la fonction stockée
             const vehicleData = [{
                 brand: vehicle.brand,
                 model: vehicle.model,
@@ -70,22 +68,7 @@ export const useVehicleStore = defineStore('vehicle', () => {
                 }
             }]
 
-            console.log('vehicleData', vehicleData)
-
-            const data = vehicleData
-
-            // Appeler la fonction stockée
-            // const { data, error } = await supabase.rpc('save_vehicles', {
-            //     vehicles_data: vehicleData
-            // })
-
-            // if (error) throw error
-            // if (!data || data.length === 0) throw new Error('Aucun véhicule créé')
-
-            // Recharger les véhicules
-            // await fetchVehicles()
-
-            return { data: data[0], error: null }
+            return { data: vehicleData[0], error: null }
         } catch (error) {
             return { data: null, error }
         }
@@ -95,7 +78,6 @@ export const useVehicleStore = defineStore('vehicle', () => {
         if (!vehicle.id) throw new Error('Vehicle ID is required')
 
         try {
-            // Préparer les données pour la fonction stockée
             const vehicleData = [{
                 id: vehicle.id,
                 brand: vehicle.brand,
@@ -117,14 +99,12 @@ export const useVehicleStore = defineStore('vehicle', () => {
                 }
             }]
 
-            // Appeler la fonction stockée
             const { data, error } = await supabase.rpc('save_vehicles', {
                 vehicles_data: vehicleData
             })
 
             if (error) throw error
 
-            // Recharger les véhicules
             await fetchVehicles()
         } catch (error) {
             throw error
@@ -132,15 +112,48 @@ export const useVehicleStore = defineStore('vehicle', () => {
     }
 
     const deleteVehicle = async (id: string) => {
-        // Utiliser la fonction stockée pour supprimer le véhicule et toutes ses relations
         const { error } = await supabase.rpc('delete_vehicle', {
             vehicle_id_param: id
         })
 
         if (error) throw error
 
-        // refresh the page
         window.location.reload()
+    }
+
+    const saveVehicles = async (vehicles: Vehicle[]) => {
+        try {
+            if (!vehicles || vehicles.length === 0) {
+                throw new Error('Aucun véhicule à sauvegarder')
+            }
+
+            vehicles.forEach((vehicle, index) => {
+                if (!vehicle.id) {
+                    throw new Error('Tous les véhicules doivent avoir un ID')
+                }
+            })
+
+            const vehiclesData = vehicles.map(vehicle => ({
+                ...vehicle,
+                details: {
+                    price_details: vehicle.details?.price_details || {},
+                    status_details: vehicle.details?.status_details || {},
+                    features: vehicle.details?.features || {},
+                    ownership: vehicle.details?.ownership || []
+                }
+            }))
+
+            const { data, error } = await supabase
+                .rpc('save_vehicles', {
+                    vehicles_data: vehiclesData
+                })
+
+            if (error) throw error
+
+            return data
+        } catch (error) {
+            throw error
+        }
     }
 
     return {
@@ -148,6 +161,7 @@ export const useVehicleStore = defineStore('vehicle', () => {
         fetchVehicles,
         createVehicle,
         updateVehicle,
-        deleteVehicle
+        deleteVehicle,
+        saveVehicles
     }
 })

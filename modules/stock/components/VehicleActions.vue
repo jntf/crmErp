@@ -34,7 +34,8 @@ import {
     RefreshCcw,
     Building2,
     ShoppingCart,
-    Upload
+    Upload,
+    Settings2
 } from 'lucide-vue-next'
 import {
     Tooltip,
@@ -56,6 +57,7 @@ const emit = defineEmits<{
     (e: 'changeSupplier'): void
     (e: 'createOrder'): void
     (e: 'importExcel'): void
+    (e: 'manage-equipment'): void
 }>()
 
 const actions = computed(() => [
@@ -107,6 +109,13 @@ const actions = computed(() => [
         tooltip: 'Créer un bon de commande',
         requiresSelection: true,
         handler: () => emit('createOrder')
+    },
+    {
+        id: 'equipment',
+        icon: Settings2,
+        tooltip: 'Gérer les équipements',
+        requiresSelection: true,
+        handler: () => emit('manage-equipment')
     }
 ])
 </script> 

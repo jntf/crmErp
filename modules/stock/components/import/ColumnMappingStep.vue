@@ -175,7 +175,7 @@ const availableFields = [
     { value: 'version', label: 'Version', aliases: ['version'] },
     { value: 'year', label: 'Année', pattern: /^\d{4}$/, required: true, aliases: ['annee', 'year'] },
     { value: 'mileage', label: 'Kilométrage', pattern: /^\d+$/, required: true, aliases: ['km', 'kilometrage', 'mileage', 'kms'] },
-    { value: 'fuel_type', label: 'Carburant', options: ['diesel', 'essence', 'hybrid', 'electric'], required: true, aliases: ['carburant', 'fuel_type', 'energy', 'energie'] },
+    { value: 'fuel_type', label: 'Carburant', options: ['diesel', 'essence', 'hybrid', 'electric', 'hybride', 'hybride rechargeable', 'hybride rechargeable', 'hybride rechargeable', 'hybride rechargeable', 'phev', 'mhev'], required: true, aliases: ['carburant', 'fuel_type', 'energy', 'energie'] },
     { value: 'transmission', label: 'Boîte de vitesse', options: ['manual', 'automatic', 'bvm5', 'bvm6', 'bva5', 'bva6', 'bvm', 'bva', 'bvm5', 'bvm6', 'bva7', 'bva9'], required: true, aliases: ['boite', 'transmission', 'gear'] },
     { value: 'color', label: 'Couleur', required: true, aliases: ['couleur', 'color', 'colour'] },
     { value: 'co2_emissions', label: 'Émissions CO2', pattern: /^\d+$/, aliases: ['co2', 'emissions'] },

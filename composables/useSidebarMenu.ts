@@ -7,7 +7,10 @@ import {
     ShoppingCartIcon,
     CarIcon,
     ClipboardIcon,
-    GlobeIcon
+    GlobeIcon,
+    ShieldIcon,
+    PercentIcon,
+    LayoutGridIcon
 } from 'lucide-vue-next'
 import { useModuleStore } from '@/stores/useModuleStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -70,8 +73,9 @@ export const useSidebarMenu = () => {
                 {
                     label: 'Commandes',
                     icon: ShoppingCartIcon,
-                    path: '/erp/commandes',
-                    badge: 5,
+                    path: '/orders',
+                    module: 'orders',
+                    description: 'Gestion des commandes',
                     roles: ['user']
                 }
             ]

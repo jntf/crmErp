@@ -21,9 +21,14 @@ export default defineNuxtConfig({
     'shadcn-nuxt',
     '@nuxtjs/supabase',
     '@pinia/nuxt',
+    ['@i2d/nuxt-pdf-frame', {
+      debug: process.env.NODE_ENV === 'development',
+      clientOnly: true
+    }],
     './modules/webStock',
     './modules/entity',
-    './modules/stock'
+    './modules/stock',
+    './modules/orders'
   ],
   shadcn: {
     prefix: '',
@@ -46,5 +51,22 @@ export default defineNuxtConfig({
       GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY
     }
   },
-  compatibilityDate: '2024-12-24'
+  compatibilityDate: '2024-12-24',
+  components: {
+    dirs: [
+      '~/components',
+      {
+        path: '~/components',
+        pattern: '**/pdf/*PdfTemplate.vue',
+        global: true,
+        prefix: 'Pdf'
+      },
+      {
+        path: '~/modules',
+        pattern: '**/composants/pdf/*.vue',
+        global: true,
+        prefix: 'Pdf'
+      }
+    ]
+  }
 })

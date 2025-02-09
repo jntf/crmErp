@@ -1,10 +1,19 @@
 export default defineNuxtRouteMiddleware(async () => {
-    const userStore = useState('user')
+    const user = useSupabaseUser()
+    const supabase = useSupabaseClient()
+    
+    if (!user.value) {
+        return navigateTo('/login')
+    }
 
-    if (!userStore.value.roles.includes('superadmin')) {
+    const { data: isSuperAdmin, error } = await supabase
+        .rpc('is_superadmin_v2', { user_uuid: user.value.id })
+
+    if (error || !isSuperAdmin) {
+        console.error('Middleware superadmin error:', error)
         throw createError({
             statusCode: 403,
-            message: 'Accès non autorisé'
+            message: 'Accès réservé aux super administrateurs'
         })
     }
 })

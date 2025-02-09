@@ -280,31 +280,17 @@ const nextStep = () => {
 }
 
 const handleValidationComplete = (validatedData: ValidationData) => {
-    console.log('Données reçues dans ImportExcelDialog:', validatedData)
     mappedData.value = validatedData.data
     selectedSupplier.value = validatedData.supplier
-    console.log('Données après assignation:', {
-        mappedData: mappedData.value,
-        selectedSupplier: selectedSupplier.value
-    })
 }
 
 const handleImport = async () => {
     if (!mappedData.value.length) return
 
     try {
-        // Préparer les données en une seule fois
         const vehiclesData = mappedData.value.map(vehicleData => {
-            // Log pour debug
-            console.log('Traitement véhicule:', {
-                status: vehicleData.status,
-                details: vehicleData.details,
-                supplier: selectedSupplier.value
-            })
-            
             return {
                 ...vehicleData,
-                // Conversion des champs numériques
                 year: parseInt(vehicleData.year),
                 mileage: parseInt(vehicleData.mileage),
                 details: {
@@ -340,9 +326,6 @@ const handleImport = async () => {
             }
         })
 
-        console.log('Données finales préparées pour l\'import:', vehiclesData)
-
-        // Une seule requête pour tous les véhicules
         const { data, error } = await supabase.rpc('save_vehicles', {
             vehicles_data: vehiclesData
         } as any)
@@ -354,11 +337,9 @@ const handleImport = async () => {
             description: `${vehiclesData.length} véhicules ont été importés avec succès`
         })
 
-        // Pas besoin de recharger via le store, on a déjà les données
         emit('import-complete', data)
         emit('update:modelValue', false)
     } catch (error: any) {
-        console.error('Erreur lors de l\'import:', error)
         toast({
             title: 'Erreur d\'import',
             description: error.message || 'Une erreur est survenue lors de l\'import',

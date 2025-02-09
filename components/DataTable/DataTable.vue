@@ -2,9 +2,16 @@
 <template>
     <div class="data-table-wrapper">
         <!-- Toolbar -->
-        <DataTableToolbar v-if="!loadingState" :columns="tableColumns"
-            :searchPlaceholder="tableSettings?.searchPlaceholder" :selectedCount="selectedItems.length"
-            :visibleColumns="visibleColumnIds" @search="handleSearch" @toggleColumn="toggleColumn"
+        <DataTableToolbar 
+            v-if="!loadingState" 
+            :columns="tableColumns || []"
+            :selected-count="selectedItems.length"
+            :visible-columns="visibleColumnIds"
+            :is-read-only="isReadOnly"
+            :data="processedTableData"
+            :filename="toolbarConfig?.exportFileName"
+            @toggleColumn="toggleColumn"
+            @toggleReadOnly="toggleReadOnly"
             @export="handleExport">
             <template #actions>
                 <slot name="toolbar-actions" :selectedItems="selectedItems"></slot>
@@ -18,9 +25,18 @@
 
         <!-- Table -->
         <div v-else-if="isHydrated">
-            <hot-table :data="processedTableData" :settings="mergedTableSettings" :rowHeaders="true"
-                :colHeaders="columnHeaders" :height="tableHeight" :width="tableWidth" @afterChange="handleChange"
-                @afterSelection="handleSelection" class="excel-theme" ref="hotTableRef" />
+            <hot-table 
+                :data="processedTableData" 
+                :settings="mergedTableSettings" 
+                :rowHeaders="true"
+                :colHeaders="columnHeaders" 
+                :height="tableHeight" 
+                :width="tableWidth" 
+                @afterChange="handleChange"
+                @afterSelection="handleSelection" 
+                class="excel-theme" 
+                ref="hotTableRef" 
+            />
         </div>
     </div>
 </template>
@@ -28,27 +44,37 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
 import DataTableToolbar from './DataTableToolbar.vue'
-import { exportToCSV, exportToExcel } from './utils/export'
+import { exportToCSV, exportToExcel, exportToPDF } from './utils/export'
+
+// Types
+interface Column {
+    data: string
+    title: string
+    required?: boolean
+    width?: number
+    className?: string
+    readOnly?: boolean
+}
 
 interface TableProps {
-    tableData: any[] | any;
-    tableColumns?: any[];
-    tableHeight?: number | string;
-    tableWidth?: number | string;
-    tableSettings?: object;
-    isEditable?: boolean;
+    tableData: any[]
+    tableColumns?: Column[]
+    tableHeight?: number | string
+    tableWidth?: number | string
+    tableSettings?: Record<string, any>
+    isEditable?: boolean
     toolbarConfig?: {
-        searchPlaceholder?: string;
-        exportFileName?: string;
-    };
-    cellRenderers?: Record<string, (value: any, row: any) => string>;
-    loadingState?: boolean;
+        searchPlaceholder?: string
+        exportFileName?: string
+    }
+    cellRenderers?: Record<string, (value: any, row: any) => string>
+    loadingState?: boolean
 }
 
 const props = withDefaults(defineProps<TableProps>(), {
     tableHeight: 'auto',
     tableWidth: 'auto',
-    isEditable: false,
+    isEditable: true,
     tableSettings: () => ({}),
     toolbarConfig: () => ({
         searchPlaceholder: 'Rechercher...',
@@ -70,6 +96,7 @@ const hotTableRef = ref<any>(null)
 const selectedItems = ref<any[]>([])
 const visibleColumnIds = ref<string[]>(props.tableColumns?.map(col => col.data) || [])
 const searchQuery = ref('')
+const isReadOnly = ref(true)
 
 const tableStyle = computed(() => ({
     height: props.tableHeight === 'auto' ? 'auto' : `${props.tableHeight}px`,
@@ -125,12 +152,12 @@ const mergedTableSettings = computed(() => {
         .map(col => ({
             ...col,
             className: `${col.className || ''} text-xs`,
-            readOnly: !props.isEditable || col.readOnly,
+            readOnly: isReadOnly.value || col.readOnly,
         }));
 
     return {
         licenseKey: 'non-commercial-and-evaluation',
-        readOnly: !props.isEditable,
+        readOnly: isReadOnly.value,
         columns: columnSettings,
         colHeaders: columnHeaders.value,
         filters: true,
@@ -153,6 +180,11 @@ const mergedTableSettings = computed(() => {
         enterMoves: { row: 1, col: 0 },
         fillHandle: false,
         autoColumnSize: false,
+        afterChange: (changes: any[], source: string) => {
+            if (changes && source !== 'loadData') {
+                handleChange(changes)
+            }
+        },
         contextMenu: {
             items: {
                 row_above: false,
@@ -202,25 +234,24 @@ const handleSelection = (rowStart: number, colStart: number, rowEnd: number, col
         return
     }
 
-    const selected = []
-    const rowIndexes = new Set() // Pour éviter les doublons
+    const selected: any[] = []
+    const rowIndexes = new Set<number>()
 
-    // Récupérer toutes les sélections actives
     const selectedRanges = hotTable.getSelected() || []
     console.log('Selected ranges:', selectedRanges)
 
-    selectedRanges.forEach(([fromRow, fromCol, toRow, toCol]) => {
+    selectedRanges.forEach(([fromRow, fromCol, toRow, toCol]: number[]) => {
         for (let row = Math.min(fromRow, toRow); row <= Math.max(fromRow, toRow); row++) {
             rowIndexes.add(row)
         }
     })
 
-    // Convertir les index en données
-    Array.from(rowIndexes).forEach(rowIndex => {
+    Array.from(rowIndexes).forEach((rowIndex: number) => {
         if (processedTableData.value[rowIndex]) {
             selected.push(processedTableData.value[rowIndex])
         }
     })
+
     selectedItems.value = selected
     emit('selection', selected)
 }
@@ -231,18 +262,27 @@ const handleExport = async (format: string) => {
 
     // Si des éléments sont sélectionnés, on n'exporte que ceux-là
     const dataToExport = selectedItems.value.length > 0
-        ? [...selectedItems.value] // Créer une copie pour éviter les problèmes de réactivité
+        ? [...selectedItems.value]
         : [...processedTableData.value]
 
-    console.log('Données à exporter:', dataToExport)
+    // Récupérer uniquement les colonnes visibles
+    const visibleColumns = props.tableColumns?.filter(col => visibleColumnIds.value.includes(col.data)) || []
 
     try {
-        if (format === 'csv') {
-            console.log('Exporting to CSV...')
-            await exportToCSV(dataToExport, props.tableColumns || [], props.toolbarConfig?.exportFileName)
-        } else if (format === 'xlsx') {
-            console.log('Exporting to Excel...')
-            await exportToExcel(dataToExport, props.tableColumns || [], props.toolbarConfig?.exportFileName)
+        const filename = props.toolbarConfig?.exportFileName || 'export'
+        
+        switch (format) {
+            case 'csv':
+                await exportToCSV(dataToExport, visibleColumns, filename)
+                break
+            case 'excel':
+                await exportToExcel(dataToExport, visibleColumns, filename)
+                break
+            case 'pdf':
+                await exportToPDF(dataToExport, visibleColumns, filename)
+                break
+            default:
+                console.warn('Format d\'export non supporté:', format)
         }
     } catch (error) {
         console.error('Erreur lors de l\'export:', error)
@@ -251,15 +291,30 @@ const handleExport = async (format: string) => {
 
 // Methods
 const handleChange = (changes: any[]) => {
+    console.log('DataTable handleChange called with:', changes)
     if (!changes) return
-    emit('change', changes)
 
     if (props.isEditable && changes) {
         const newData = [...processedTableData.value]
         changes.forEach(([row, prop, oldValue, newValue]) => {
-            newData[row][prop] = newValue
+            if (newData[row]) {
+                // Mise à jour de la valeur dans les données
+                const propPath = prop.split('.')
+                let current = newData[row]
+                
+                for (let i = 0; i < propPath.length - 1; i++) {
+                    if (!current[propPath[i]]) {
+                        current[propPath[i]] = {}
+                    }
+                    current = current[propPath[i]]
+                }
+                current[propPath[propPath.length - 1]] = newValue
+            }
         })
+        
+        console.log('Nouvelles données après modification:', newData)
         emit('update:tableData', newData)
+        emit('change', changes)
     }
 }
 
@@ -274,6 +329,10 @@ const toggleColumn = (columnId: string) => {
     } else {
         visibleColumnIds.value.splice(index, 1)
     }
+}
+
+const toggleReadOnly = () => {
+    isReadOnly.value = !isReadOnly.value
 }
 
 onMounted(async () => {

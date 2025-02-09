@@ -54,16 +54,34 @@
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" class="w-48">
+                    <DropdownMenuItem @click="handleExportClick('excel')" class="flex items-center">
+                        <FileSpreadsheet class="h-4 w-4 mr-2" />
+                        <span>Excel</span>
+                    </DropdownMenuItem>
                     <DropdownMenuItem @click="handleExportClick('csv')" class="flex items-center">
                         <FileText class="h-4 w-4 mr-2" />
-                        <span>Exporter en CSV</span>
+                        <span>CSV</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem @click="handleExportClick('xlsx')" class="flex items-center">
-                        <Table class="h-4 w-4 mr-2" />
-                        <span>Exporter en Excel</span>
+                    <DropdownMenuItem @click="handleExportClick('pdf')" class="flex items-center">
+                        <FileDown class="h-4 w-4 mr-2" />
+                        <span>PDF</span>
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
+
+            <!-- Read-only toggle -->
+            <Button 
+                variant="ghost" 
+                size="icon" 
+                class="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                @click="emit('toggleReadOnly')"
+            >
+                <component 
+                    :is="props.isReadOnly ? Lock : Unlock"
+                    class="h-4 w-4 text-gray-500 dark:text-gray-400" 
+                />
+                <span class="sr-only">{{ props.isReadOnly ? 'Activer l\'édition' : 'Désactiver l\'édition' }}</span>
+            </Button>
         </div>
 
         <!-- Main toolbar content -->
@@ -94,9 +112,10 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Download, FileText, Table } from 'lucide-vue-next'
+import { Download, FileText, FileSpreadsheet, FileDown, Table, Lock, Unlock } from 'lucide-vue-next'
 import { TransitionRoot } from '@headlessui/vue'
 import { Button } from '@/components/ui/button'
+import { exportToCSV, exportToExcel, exportToPDF } from './utils/export'
 import {
     Popover,
     PopoverContent,
@@ -128,15 +147,21 @@ interface Props {
     columns: Column[]
     selectedCount: number
     visibleColumns: string[]
+    isReadOnly: boolean
+    data: any[]
+    filename?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    selectedCount: 0
+    selectedCount: 0,
+    isReadOnly: false,
+    filename: 'export'
 })
 
 const emit = defineEmits<{
     'toggleColumn': [column: string]
     'export': [format: string]
+    'toggleReadOnly': []
 }>()
 
 const isColumnVisible = (column: Column): boolean => {
@@ -147,8 +172,26 @@ const toggleColumn = (column: Column): void => {
     emit('toggleColumn', column.data)
 }
 
-const handleExportClick = (format: 'csv' | 'xlsx'): void => {
-    emit('export', format)
+const handleExportClick = async (format: 'csv' | 'excel' | 'pdf'): Promise<void> => {
+    try {
+        const visibleColumnsData = props.columns.filter(col => isColumnVisible(col))
+        
+        emit('export', format)
+
+        switch (format) {
+            case 'csv':
+                await exportToCSV(props.data, visibleColumnsData, props.filename)
+                break
+            case 'excel':
+                await exportToExcel(props.data, visibleColumnsData, props.filename)
+                break
+            case 'pdf':
+                await exportToPDF(props.data, visibleColumnsData, props.filename)
+                break
+        }
+    } catch (error) {
+        console.error(`Erreur lors de l'export ${format}:`, error)
+    }
 }
 </script>
 

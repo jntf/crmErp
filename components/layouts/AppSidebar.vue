@@ -76,19 +76,76 @@
                     <DropdownMenuLabel>Mon compte</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     
-                    <NuxtLink to="/profile">
+                    <NuxtLink to="/settings/profile">
                         <DropdownMenuItem>
                             <UserIcon class="w-4 h-4 mr-2" />
                             <span>Profil</span>
                         </DropdownMenuItem>
                     </NuxtLink>
                     
-                    <NuxtLink to="/settings">
+                    <NuxtLink to="/settings/notifications">
                         <DropdownMenuItem>
-                            <SettingsIcon class="w-4 h-4 mr-2" />
-                            <span>Paramètres</span>
+                            <BellIcon class="w-4 h-4 mr-2" />
+                            <span>Notifications</span>
                         </DropdownMenuItem>
                     </NuxtLink>
+
+                    <DropdownMenuSeparator />
+
+                    <DropdownMenuLabel>Société</DropdownMenuLabel>
+                    <NuxtLink v-if="authStore.hasRole('admin')" to="/admin/company">
+                        <DropdownMenuItem>
+                            <BuildingIcon class="w-4 h-4 mr-2" />
+                            <span>Informations</span>
+                        </DropdownMenuItem>
+                    </NuxtLink>
+                    
+                    <NuxtLink v-if="authStore.hasRole('admin')" to="/admin/company/commissions">
+                        <DropdownMenuItem>
+                            <PercentIcon class="w-4 h-4 mr-2" />
+                            <span>Commissions</span>
+                        </DropdownMenuItem>
+                    </NuxtLink>
+
+                    <template v-if="authStore.hasRole('superadmin')">
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Administration</DropdownMenuLabel>
+                        
+                        <NuxtLink to="/admin/owners">
+                            <DropdownMenuItem>
+                                <BuildingIcon class="w-4 h-4 mr-2" />
+                                <span>Sociétés</span>
+                            </DropdownMenuItem>
+                        </NuxtLink>
+
+                        <NuxtLink to="/admin/users">
+                            <DropdownMenuItem>
+                                <Users2Icon class="w-4 h-4 mr-2" />
+                                <span>Utilisateurs</span>
+                            </DropdownMenuItem>
+                        </NuxtLink>
+
+                        <NuxtLink to="/admin/modules">
+                            <DropdownMenuItem>
+                                <LayoutGridIcon class="w-4 h-4 mr-2" />
+                                <span>Modules</span>
+                            </DropdownMenuItem>
+                        </NuxtLink>
+
+                        <NuxtLink to="/admin/commissions/types">
+                            <DropdownMenuItem>
+                                <PercentIcon class="w-4 h-4 mr-2" />
+                                <span>Types de commissions</span>
+                            </DropdownMenuItem>
+                        </NuxtLink>
+
+                        <NuxtLink to="/admin/commissions/settings">
+                            <DropdownMenuItem>
+                                <WrenchIcon class="w-4 h-4 mr-2" />
+                                <span>Paramètres commissions</span>
+                            </DropdownMenuItem>
+                        </NuxtLink>
+                    </template>
                     
                     <DropdownMenuSeparator />
                     
@@ -110,7 +167,13 @@ import {
     UserIcon,
     XIcon,
     HomeIcon,
-    ChevronDownIcon
+    ChevronDownIcon,
+    BellIcon,
+    BuildingIcon,
+    PercentIcon,
+    Users2Icon,
+    LayoutGridIcon,
+    WrenchIcon
 } from 'lucide-vue-next'
 import { useSidebarMenu } from '@/composables/useSidebarMenu'
 import { useAuthStore } from '@/stores/useAuthStore'

@@ -20,6 +20,7 @@
             @change-supplier="handleChangeSupplier"
             @create-order="handleCreateOrder"
             @import-excel="handleImportExcel"
+            @manage-equipment="handleManageEquipment"
         />
 
         <!-- Table principale -->
@@ -92,11 +93,19 @@
             v-model="showImportModal"
             @import-complete="handleImportComplete"
         />
+
+        <!-- Modal de gestion des équipements -->
+        <EquipmentDialog
+            v-model="showEquipmentModal"
+            :selected-vehicles="selectedVehicles"
+            @save="handleEquipmentSave"
+            @update:modelValue="(val) => showEquipmentModal = val"
+        />
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Trash2 } from 'lucide-vue-next'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ConfirmDialog } from '@/components/ui/dialog'
@@ -111,6 +120,9 @@ import StatusUpdateModal from '../components/StatusUpdateModal.vue'
 import CommercialOfferDialog from '../components/CommercialOfferDialog.vue'
 import SupplierSelectionDialog from '../components/SupplierSelectionDialog.vue'
 import ImportExcelDialog from '../components/ImportExcelDialog.vue'
+import EquipmentDialog from '../components/EquipmentDialog.vue'
+import { format, parseISO } from 'date-fns'
+import { fr } from 'date-fns/locale'
 
 const router = useRouter()
 const { toast } = useToast()
@@ -124,6 +136,7 @@ const showStatusModal = ref(false)
 const showOfferModal = ref(false)
 const showSupplierModal = ref(false)
 const showImportModal = ref(false)
+const showEquipmentModal = ref(false)
 const selectedVehicle = ref<Vehicle | null>(null)
 const selectedVehicles = ref<Vehicle[]>([])
 const searchState = ref({
@@ -143,6 +156,16 @@ interface FlattenedVehicle extends Vehicle {
     vehicle_status: VehicleStatusEnum;
     vehicle_location: string;
     vehicle_is_online: boolean;
+    // Caractéristiques techniques
+    doors: number;
+    seats: number;
+    power_fiscal: number;
+    power_hp: number;
+    co2_emissions: number;
+    registration_date: string;
+    // Équipements
+    vehicle_serie: string;
+    vehicle_options: string;
     // Actions
     actions: string;
 }
@@ -155,7 +178,6 @@ const columns = [
         title: 'Statut',
         type: 'text',
         width: 90,
-
         className: 'htCenter',
         renderer(instance: any, td: any, row: any, col: any, prop: any, value: any) {
             td.innerHTML = cellRenderers.status(value);
@@ -188,6 +210,26 @@ const columns = [
         className: 'htLeft'
     },
     // Caractéristiques techniques
+    {
+        data: 'registration_date',
+        title: 'M.E.C',
+        type: 'date',
+        className: 'htCenter',
+        width: 90,
+        renderer(instance: any, td: any, row: any, col: any, prop: any, value: any) {
+            if (value) {
+                try {
+                    const date = parseISO(value)
+                    td.innerHTML = format(date, 'dd/MM/yyyy', { locale: fr })
+                } catch (error) {
+                    td.innerHTML = value || ''
+                }
+            } else {
+                td.innerHTML = ''
+            }
+            return td
+        }
+    },
     {
         data: 'year',
         title: 'Année',
@@ -262,6 +304,22 @@ const columns = [
         type: 'numeric',
         className: 'htCenter',
         width: 70
+    },
+    // Équipements de série
+    {
+        data: 'vehicle_serie',
+        title: 'Équip. Série',
+        type: 'text',
+        className: 'htLeft',
+        width: 200
+    },
+    // Options
+    {
+        data: 'vehicle_options',
+        title: 'Options',
+        type: 'text',
+        className: 'htLeft',
+        width: 200
     },
     // Identifiants
     {
@@ -362,12 +420,8 @@ const tableSettings = {
     rowHeaders: true,
     trimWhitespace: true,
     afterSelectionEnd: (rowStart: number, colStart: number, rowEnd: number, colEnd: number, preventScrolling: object, selectionLayerLevel: number) => {
-        console.log('Selection:', { rowStart, colStart, rowEnd, colEnd })
-        console.log('Données disponibles:', vehiclesData.value)
-        
         // Si pas de données, on sort
         if (!vehiclesData.value.length) {
-            console.log('Aucune donnée disponible')
             return
         }
 
@@ -382,7 +436,6 @@ const tableSettings = {
             }
         }
 
-        console.log('Véhicules trouvés dans la sélection:', selectedVehiclesList)
         handleSelection(selectedVehiclesList)
     },
     afterOnCellMouseDown: (event: MouseEvent, coords: any, TD: HTMLElement) => {
@@ -436,31 +489,126 @@ const toolbarConfig = {
 // Handlers
 const handleSelection = (vehicles: Vehicle[]) => {
     selectedVehicles.value = [...vehicles]
-    console.log('État final de la sélection:', selectedVehicles.value)
 }
 
 const handleDeleteRequest = (vehicles?: Vehicle[]) => {
-    console.log('Action: Suppression')
     if (vehicles) {
-        console.log('Véhicules à supprimer:', vehicles)
         selectedVehicles.value = vehicles
     }
-    console.log('IDs à supprimer:', selectedVehicles.value.map(v => v.id))
     showConfirmDialog.value = true
 }
 
-const handleChange = (changes: Array<[number, string, any, any]>) => {
-    console.log('Modifications:', changes)
+const handleChange = async (changes: Array<[number, string, any, any]>) => {
+    if (!changes || changes.length === 0) return
+    
+    try {
+        const modifiedRows = new Set<number>()
+        changes.forEach(([row, prop, oldValue, newValue]) => {
+            modifiedRows.add(row)
+        })
+        
+        const vehiclesToSave = Array.from(modifiedRows).map(rowIndex => {
+            const originalVehicle = vehiclesData.value[rowIndex]
+            const vehicleToUpdate = JSON.parse(JSON.stringify(originalVehicle))
+
+            // S'assurer que les structures sont initialisées correctement
+            if (!vehicleToUpdate.details) {
+                vehicleToUpdate.details = {
+                    price_details: {
+                        purchase_price_ht: 0,
+                        selling_price_ht: 0,
+                        vat_rate: 20,
+                        repair_cost: 0,
+                        frevo: 0
+                    },
+                    status_details: {
+                        status: vehicleToUpdate.status || VehicleStatusEnum.IN_STOCK,
+                        location: '',
+                        is_online: false,
+                        exposed_id: null
+                    },
+                    features: {
+                        features: {
+                            serie: [],
+                            options: []
+                        }
+                    }
+                }
+            }
+
+            changes
+                .filter(([row]) => row === rowIndex)
+                .forEach(([_, prop, __, newValue]) => {
+                    // Mapping des prix
+                    if (prop === 'vehicle_price_ht') {
+                        vehicleToUpdate.details.price_details.purchase_price_ht = parseFloat(newValue) || 0
+                    }
+                    else if (prop === 'vehicle_selling_price_ht') {
+                        vehicleToUpdate.details.price_details.selling_price_ht = parseFloat(newValue) || 0
+                    }
+                    else if (prop === 'vehicle_repair_cost') {
+                        vehicleToUpdate.details.price_details.repair_cost = parseFloat(newValue) || 0
+                    }
+                    else if (prop === 'vehicle_frevo') {
+                        vehicleToUpdate.details.price_details.frevo = parseFloat(newValue) || 0
+                    }
+                    else if (prop === 'vehicle_vat_rate') {
+                        vehicleToUpdate.details.price_details.vat_rate = parseFloat(newValue) || 20
+                    }
+                    // Mapping du statut
+                    else if (prop === 'vehicle_status') {
+                        vehicleToUpdate.details.status_details.status = newValue
+                        vehicleToUpdate.status = newValue // Mise à jour aussi au niveau racine
+                    }
+                    else if (prop === 'vehicle_location') {
+                        vehicleToUpdate.details.status_details.location = newValue || ''
+                    }
+                    else if (prop === 'vehicle_is_online') {
+                        vehicleToUpdate.details.status_details.is_online = Boolean(newValue)
+                    }
+                    // Mapping des équipements
+                    else if (prop === 'vehicle_serie') {
+                        vehicleToUpdate.details.features.features.serie = newValue ? newValue.split(',').map((s: string) => s.trim()) : []
+                    }
+                    else if (prop === 'vehicle_options') {
+                        vehicleToUpdate.details.features.features.options = newValue ? newValue.split(',').map((s: string) => s.trim()) : []
+                    }
+                    // Pour les autres propriétés, mise à jour directe
+                    else {
+                        vehicleToUpdate[prop] = newValue
+                    }
+                })
+
+            return vehicleToUpdate
+        })
+
+        toast({
+            title: "Sauvegarde en cours",
+            description: "Veuillez patienter..."
+        })
+
+        const result = await vehicleStore.saveVehicles(vehiclesToSave)
+
+        toast({
+            title: "Modifications enregistrées",
+            description: `${vehiclesToSave.length} véhicule(s) mis à jour avec succès`
+        })
+
+        await vehicleStore.fetchVehicles()
+
+    } catch (error) {
+        toast({
+            title: "Erreur de sauvegarde",
+            description: error instanceof Error ? error.message : "Une erreur est survenue lors de la sauvegarde des modifications",
+            variant: "destructive"
+        })
+    }
 }
 
 const handleExport = (format: 'csv' | 'xlsx') => {
-    console.log('Action: Export', format)
     const dataToExport = selectedVehicles.value.length > 0
         ? selectedVehicles.value
         : vehiclesData.value
-
-    console.log('Données à exporter:', dataToExport)
-    console.log('IDs à exporter:', dataToExport.map(v => v.id))
 
     if (format === 'csv') {
         exportToCSV(dataToExport, columns, toolbarConfig.exportFileName)
@@ -552,9 +700,6 @@ const handleChangeSupplier = async () => {
 }
 
 const handleCreateOrder = async () => {
-    console.log('Action: Création bon de commande')
-    console.log('Véhicules sélectionnés:', selectedVehicles.value)
-    console.log('IDs des véhicules:', selectedVehicles.value.map(v => v.id))
     // TODO: Implémenter la création de bon de commande
 }
 
@@ -591,6 +736,11 @@ const vehiclesData = computed<VehicleTableData[]>(() => {
         vehicle_status: (vehicle.details?.status_details?.status || VehicleStatusEnum.IN_STOCK) as VehicleStatusEnum,
         vehicle_location: vehicle.details?.status_details?.location || '',
         vehicle_is_online: vehicle.details?.status_details?.is_online || false,
+        // Date
+        registration_date: vehicle.registration_date || null,
+        // Équipements
+        vehicle_serie: vehicle.details?.features?.serie?.join(', ') || '',
+        vehicle_options: vehicle.details?.features?.options?.join(', ') || '',
         // Ownership
         vehicle_ownership: vehicle.details?.ownership?.[0]?.company?.name || '',
         // Actions
@@ -678,7 +828,6 @@ const handleImportComplete = async (data: any[]) => {
         // Recharger les véhicules
         await vehicleStore.fetchVehicles()
     } catch (error) {
-        console.error('Erreur lors de l\'import:', error)
         toast({
             title: "Erreur lors de l'import",
             description: "Une erreur est survenue lors de l'import des véhicules",
@@ -694,9 +843,7 @@ onMounted(async () => {
     loading.value = true
     try {
         await vehicleStore.fetchVehicles()
-        console.log('Véhicules chargés:', vehicleStore.vehicles)
     } catch (error) {
-        console.error('Erreur lors du chargement des véhicules:', error)
         toast({
             title: "Erreur de chargement",
             description: "Impossible de charger les véhicules",
@@ -705,6 +852,56 @@ onMounted(async () => {
     } finally {
         loading.value = false
     }
+})
+
+const handleManageEquipment = () => {
+    if (selectedVehicles.value.length === 0) {
+        toast({
+            title: "Aucun véhicule sélectionné",
+            description: "Veuillez sélectionner au moins un véhicule",
+            variant: "destructive"
+        })
+        return
+    }
+    showEquipmentModal.value = true
+}
+
+const handleEquipmentSave = async (serie: string[], options: string[]) => {
+    try {
+        // Mettre à jour chaque véhicule sélectionné
+        await Promise.all(selectedVehicles.value.map(vehicle => {
+            const updatedVehicle = {
+                id: vehicle.id,
+                details: {
+                    ...vehicle.details,
+                    features: {
+                        ...vehicle.details?.features,
+                        serie,
+                        options
+                    }
+                }
+            }
+            return vehicleStore.updateVehicle(updatedVehicle)
+        }))
+
+        toast({
+            title: "Équipements mis à jour",
+            description: `Les équipements ont été mis à jour pour ${selectedVehicles.value.length} véhicule(s)`
+        })
+
+        // Recharger les données
+        await vehicleStore.fetchVehicles()
+    } catch (error) {
+        toast({
+            title: "Erreur",
+            description: "Une erreur est survenue lors de la mise à jour des équipements",
+            variant: "destructive"
+        })
+    }
+}
+
+watch(showEquipmentModal, (newVal) => {
+    // console.log('showEquipmentModal changed:', newVal)
 })
 </script>
 

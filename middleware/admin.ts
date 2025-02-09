@@ -1,18 +1,19 @@
 export default defineNuxtRouteMiddleware(async () => {
-    console.log('=== ADMIN MIDDLEWARE ===')
-    const authStore = useAuthStore()
-    const adminRoles = ['superadmin', 'admin']
-
-    console.log('Current user:', authStore.user)
-    console.log('Current roles in store:', authStore.roles)
+    const user = useSupabaseUser()
+    const supabase = useSupabaseClient()
     
-    const hasAdminAccess = adminRoles.some(role => authStore.hasRole(role))
-    console.log('Has admin access:', hasAdminAccess)
+    if (!user.value) {
+        return navigateTo('/login')
+    }
 
-    if (!hasAdminAccess) {
+    const { data: isAdmin, error } = await supabase
+        .rpc('is_admin_v2', { user_uuid: user.value.id })
+
+    if (error || !isAdmin) {
+        console.error('Middleware admin error:', error)
         throw createError({
             statusCode: 403,
-            message: 'Accès non autorisé'
+            message: 'Accès réservé aux administrateurs'
         })
     }
 })
