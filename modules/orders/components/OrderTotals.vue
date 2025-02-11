@@ -45,7 +45,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { OrderItem } from '../types'
-import { formatCurrency } from '~/utils/format'
+import { formatCurrency } from '~/utils/formatter'
 import { Card, CardHeader, CardTitle, CardContent } from '#components'
 
 const props = defineProps<{

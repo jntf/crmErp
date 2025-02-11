@@ -9,7 +9,7 @@ export function formatMileage(mileage: number): string {
 // Formatage des string format dd/mm/yyyy en date js pour data-table
 export function formatDate(date: string): string {
     const [day, month, year] = date.split('/')
-    if (day && month && year) { 
+    if (day && month && year) {
         return `${day}/${month}/${year}`
     }
     return 'en cours'
@@ -28,7 +28,7 @@ export function formatKilometers(mileage: number): string {
 }
 
 export function formatKilometerRange(minKm: number, maxKm: number): string {
-    return minKm === maxKm 
+    return minKm === maxKm
         ? formatKilometers(minKm)
         : `${formatKilometers(minKm)} - ${formatKilometers(maxKm)}`
 }
@@ -52,7 +52,7 @@ export function formatFeatures(features: any): FormattedFeatures {
         interior: [],
         safety: []
     }
-    
+
     return {
         comfort: features.comfort?.map((f: string) => f.trim()) || [],
         exterior: features.exterior?.map((f: string) => f.trim()) || [],
@@ -71,31 +71,54 @@ export function formatColorCount(color: string, count: number): string {
 export const formatCurrency = (amount: number | undefined): string => {
     if (amount === undefined) return ''
     return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR'
+        style: 'currency',
+        currency: 'EUR'
     }).format(amount)
-  }
-  
-  /**
-   * Formate un pourcentage
-   */
-  export const formatPercent = (value: number | undefined): string => {
+}
+
+/**
+ * Formate un pourcentage
+ */
+export const formatPercent = (value: number | undefined): string => {
     if (value === undefined) return ''
     return new Intl.NumberFormat('fr-FR', {
-      style: 'percent',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+        style: 'percent',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
     }).format(value / 100)
-  } 
-
-  /**
- * Formate une date en format français
- */
-export const formatDate1 = (date: Date | string | undefined): string => {
-  if (!date) return ''
-  return new Date(date).toLocaleDateString('fr-FR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
 }
+
+/**
+* Formate une date en format français
+*/
+export const formatDate1 = (date: Date | string | undefined): string => {
+    if (!date) return ''
+    return new Date(date).toLocaleDateString('fr-FR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    })
+}
+
+
+/**
+ * Convertit une valeur en chaîne de caractères de manière sûre
+ * @param value - La valeur à convertir
+ * @returns La chaîne convertie
+ */
+export const safeToString = (value: string | number | null | undefined): string => {
+    if (value === null || value === undefined) return ''
+    return String(value)
+}
+
+/**
+ * Convertit une valeur en nombre de manière sûre
+ * @param value - La valeur à convertir
+ * @returns Le nombre converti ou 0 si invalide
+ */
+export const safeToNumber = (value: string | number | boolean | null | undefined): number => {
+    if (value === null || value === undefined) return 0
+    if (typeof value === 'boolean') return value ? 1 : 0
+    const num = Number(value)
+    return isNaN(num) ? 0 : num
+} 

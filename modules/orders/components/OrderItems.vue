@@ -96,7 +96,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { OrderItem, Vehicle } from '../types'
-import { formatCurrency } from '~/utils/format'
+import { formatCurrency } from '~/utils/formatter'
 import VehicleSelector from './VehicleSelector.vue'
 import {
   Card,

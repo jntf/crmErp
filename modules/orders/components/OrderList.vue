@@ -84,7 +84,7 @@ import {
   useVueTable,
 } from '@tanstack/vue-table'
 import { useOrderStore } from '../stores/useOrderStore'
-import { formatCurrency } from '~/utils/format'
+import { formatCurrency } from '~/utils/formatter'
 import { formatDate } from '~/utils/formatter'
 import { valueUpdater } from '~/utils'
 import OrderStatusBadge from './OrderStatusBadge.vue'

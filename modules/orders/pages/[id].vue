@@ -14,7 +14,7 @@
           </h1>
         </div>
         <p class="text-gray-500 mt-1">
-          {{ formatDate(order?.orderDate) }}
+          {{ formatDate1(order?.orderDate) }}
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -166,7 +166,7 @@
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {{ commission.paymentDate ? formatDate(commission.paymentDate) : 'Non payée' }}
+                  {{ commission.paymentDate ? formatDate1(commission.paymentDate) : 'Non payée' }}
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -188,7 +188,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useOrderStore } from '../stores/useOrderStore'
-import { formatDate, formatCurrency } from '~/utils/format'
+import { formatDate1, formatCurrency } from '~/utils/formatter'
 import type { OrderWithRelations, SaleType } from '../types'
 import {
   Card,

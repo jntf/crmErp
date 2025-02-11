@@ -117,7 +117,7 @@ import {
   Input,
   Checkbox
 } from '#components'
-import { formatCurrency } from '~/utils/format'
+import { formatCurrency } from '~/utils/formatter'
 
 const props = defineProps<{
   modelValue: boolean

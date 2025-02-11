@@ -329,7 +329,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatCurrency, safeToString, safeToNumber } from '@/utils/formatters'
+import { formatCurrency, safeToString, safeToNumber } from '@/utils/formatter'
 import type { Commission, CommissionType, CommissionRow, CommissionColumn, CommissionValue } from '@/types/commission'
 
 definePageMeta({

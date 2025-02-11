@@ -67,6 +67,7 @@ import { ref, watch } from 'vue'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { BarChart3, PencilIcon } from 'lucide-vue-next'
+import { formatCurrency } from '@/utils/formatter'
 
 interface KeyFigures {
     revenue?: number
@@ -91,15 +92,6 @@ const editedFigures = ref<KeyFigures>({
     number_of_employees: 0,
     fleet_size: 0
 })
-
-const formatCurrency = (value?: number) => {
-    if (!value) return '-'
-    return new Intl.NumberFormat('fr-FR', {
-        style: 'currency',
-        currency: 'EUR',
-        maximumFractionDigits: 0
-    }).format(value)
-}
 
 watch(() => props.modelValue, (newValue) => {
     if (newValue && !isEditing.value) {
