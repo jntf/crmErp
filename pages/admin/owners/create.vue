@@ -6,11 +6,12 @@
     </header>
 
     <form @submit.prevent="onSubmit" class="space-y-6">
+      <!-- Informations de la société -->
       <Card>
         <CardHeader>
-          <CardTitle>Informations de base</CardTitle>
+          <CardTitle>Informations de la société</CardTitle>
           <CardDescription>
-            Informations principales de la société
+            Informations principales de l'entreprise
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -18,12 +19,149 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div class="space-y-2">
                 <Label>Nom de la société</Label>
-                <Input v-model="form.name" placeholder="Nom de la société" required />
+                <Input v-model="form.company.name" placeholder="Nom de la société" required />
+              </div>
+              
+              <div class="space-y-2">
+                <Label>Domaine d'activité</Label>
+                <Input v-model="form.company.industry" placeholder="Domaine d'activité" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <Label>Email</Label>
+                <Input v-model="form.company.email" type="email" placeholder="Email professionnel" />
+              </div>
+              
+              <div class="space-y-2">
+                <Label>Téléphone</Label>
+                <Input v-model="form.company.phone" placeholder="Numéro de téléphone" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <Label>Site web</Label>
+                <Input v-model="form.company.website" placeholder="https://..." />
+              </div>
+              
+              <div class="space-y-2">
+                <Label>Nombre d'employés</Label>
+                <Input v-model="form.company.number_of_employees" type="number" placeholder="Nombre d'employés" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <Label>Numéro de TVA</Label>
+                <Input v-model="form.company.vat_number" placeholder="Numéro de TVA" />
+              </div>
+              
+              <div class="space-y-2">
+                <Label>SIRET</Label>
+                <Input v-model="form.company.tax_number" placeholder="Numéro SIRET" />
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <Label>Description</Label>
+              <Textarea 
+                v-model="form.company.description" 
+                placeholder="Description de la société"
+                rows="3"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- Adresse -->
+      <Card>
+        <CardHeader>
+          <CardTitle>Adresse</CardTitle>
+          <CardDescription>
+            Adresse principale de la société
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div class="grid gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="space-y-2">
+                <Label>Numéro</Label>
+                <Input v-model="form.address.street_number" placeholder="Numéro" />
+              </div>
+              
+              <div class="space-y-2 md:col-span-2">
+                <Label>Rue</Label>
+                <Input v-model="form.address.street_name" placeholder="Nom de la rue" required />
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <Label>Complément d'adresse</Label>
+              <Input v-model="form.address.address_line2" placeholder="Complément d'adresse" />
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <Label>Code postal</Label>
+                <Input v-model="form.address.postal_code" placeholder="Code postal" required />
+              </div>
+              
+              <div class="space-y-2">
+                <Label>Ville</Label>
+                <Input v-model="form.address.city" placeholder="Ville" required />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <Label>État/Région</Label>
+                <Input v-model="form.address.state" placeholder="État ou région" />
+              </div>
+              
+              <div class="space-y-2">
+                <Label>Pays</Label>
+                <Select v-model="form.address.country_id" required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionnez un pays" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem 
+                      v-for="country in countries" 
+                      :key="country.id" 
+                      :value="country.id"
+                    >
+                      {{ country.name }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- Configuration Owner -->
+      <Card>
+        <CardHeader>
+          <CardTitle>Configuration de la société</CardTitle>
+          <CardDescription>
+            Paramètres spécifiques à la plateforme
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div class="grid gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <Label>Nom d'affichage</Label>
+                <Input v-model="form.owner.name" placeholder="Nom d'affichage" required />
               </div>
               
               <div class="space-y-2">
                 <Label>Statut</Label>
-                <Select v-model="form.status">
+                <Select v-model="form.owner.status">
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionnez un statut" />
                   </SelectTrigger>
@@ -35,52 +173,31 @@
               </div>
             </div>
 
+            <div>
+              <Label class="mb-2 block">Modules</Label>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div v-for="module in availableModules" :key="module.name" class="flex items-center space-x-2">
+                  <Switch 
+                    :id="module.name"
+                    v-model="form.owner.modules[module.name]"
+                    @update:model-value="updateModules"
+                  />
+                  <Label :for="module.name">{{ module.label }}</Label>
+                </div>
+              </div>
+            </div>
+
             <div class="space-y-2">
-              <Label>Description</Label>
+              <Label>Configuration avancée</Label>
               <Textarea 
-                v-model="form.description" 
-                placeholder="Description de la société"
-                rows="3"
+                v-model="form.owner.settings" 
+                placeholder="Configuration JSON"
+                rows="4"
               />
+              <p class="text-sm text-muted-foreground">
+                Exemple: {"maxUsers": 10, "features": ["feature1", "feature2"]}
+              </p>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Modules</CardTitle>
-          <CardDescription>
-            Sélectionnez les modules à activer pour cette société
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div v-for="module in availableModules" :key="module.name" class="flex items-center space-x-2">
-              <Switch v-model="form.modules[module.name]" :id="module.name" />
-              <Label :for="module.name">{{ module.label }}</Label>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Configuration avancée</CardTitle>
-          <CardDescription>
-            Paramètres spécifiques de la société au format JSON
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div class="space-y-2">
-            <Textarea 
-              v-model="form.settings" 
-              placeholder="Configuration JSON"
-              rows="4"
-            />
-            <p class="text-sm text-muted-foreground">
-              Exemple: {"maxUsers": 10, "features": ["feature1", "feature2"]}
-            </p>
           </div>
         </CardContent>
       </Card>
@@ -117,23 +234,72 @@ definePageMeta({
 const router = useRouter()
 const supabase = useSupabaseClient()
 const isLoading = ref(false)
+const countries = ref<any[]>([])
 
 // Types
 interface CompanyForm {
   name: string
+  industry?: string
+  phone?: string
+  email?: string
+  website?: string
+  number_of_employees?: number
+  tax_number?: string
+  vat_number?: string
+  description?: string
+}
+
+interface AddressForm {
+  street_number?: string
+  street_name: string
+  address_line2?: string
+  postal_code: string
+  city: string
+  state?: string
+  country_id: string
+}
+
+interface OwnerForm {
+  name: string
   status: 'active' | 'inactive'
-  description: string
   modules: Record<string, boolean>
   settings: string
 }
 
+interface FormState {
+  company: CompanyForm
+  address: AddressForm
+  owner: OwnerForm
+}
+
 // État du formulaire
-const form = ref<CompanyForm>({
-  name: '',
-  status: 'active',
-  description: '',
-  modules: {},
-  settings: '{}'
+const form = ref<FormState>({
+  company: {
+    name: '',
+    industry: '',
+    phone: '',
+    email: '',
+    website: '',
+    number_of_employees: undefined,
+    tax_number: '',
+    vat_number: '',
+    description: ''
+  },
+  address: {
+    street_number: '',
+    street_name: '',
+    address_line2: '',
+    postal_code: '',
+    city: '',
+    state: '',
+    country_id: ''
+  },
+  owner: {
+    name: '',
+    status: 'active',
+    modules: {},
+    settings: '{}'
+  }
 })
 
 // Modules disponibles
@@ -147,11 +313,51 @@ const availableModules = [
 ]
 
 // Initialisation des modules
-onMounted(() => {
+onMounted(async () => {
+  // Initialisation des modules
   availableModules.forEach(module => {
-    form.value.modules[module.name] = false
+    form.value.owner.modules[module.name] = false
   })
+
+  // Chargement des pays
+  try {
+    const { data, error } = await supabase
+      .from('countries')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name')
+
+    if (error) throw error
+    countries.value = data || []
+  } catch (error) {
+    console.error('Error loading countries:', error)
+    toast.error('Impossible de charger la liste des pays')
+  }
 })
+
+// Mise à jour des modules
+const updateModules = () => {
+  try {
+    // Validation du JSON existant
+    const currentSettings = JSON.parse(form.value.owner.settings)
+    
+    // Mise à jour des modules activés
+    currentSettings.modules = Object.entries(form.value.owner.modules)
+      .filter(([_, enabled]) => enabled)
+      .map(([name]) => ({ name, is_active: true, settings: {} }))
+    
+    // Mise à jour du JSON
+    form.value.owner.settings = JSON.stringify(currentSettings, null, 2)
+  } catch (e) {
+    // Si le JSON n'est pas valide, on crée un nouveau
+    const settings = {
+      modules: Object.entries(form.value.owner.modules)
+        .filter(([_, enabled]) => enabled)
+        .map(([name]) => ({ name, is_active: true, settings: {} }))
+    }
+    form.value.owner.settings = JSON.stringify(settings, null, 2)
+  }
+}
 
 // Soumission du formulaire
 const onSubmit = async () => {
@@ -161,42 +367,35 @@ const onSubmit = async () => {
     // Validation du JSON
     let parsedSettings
     try {
-      parsedSettings = JSON.parse(form.value.settings)
+      parsedSettings = JSON.parse(form.value.owner.settings)
     } catch (e) {
       toast.error('Le format JSON de la configuration est invalide')
       return
     }
 
-    // 1. Créer la société
-    const { data: owner, error: ownerError } = await supabase
-      .from('owners')
-      .insert({
-        name: form.value.name,
-        status: form.value.status,
-        description: form.value.description,
-        settings: parsedSettings
+    // Préparation des données pour la fonction
+    const ownerData = {
+      name: form.value.owner.name,
+      status: form.value.owner.status,
+      settings: parsedSettings,
+      modules: Object.entries(form.value.owner.modules)
+        .filter(([_, enabled]) => enabled)
+        .map(([name]) => ({ name, is_active: true, settings: {} }))
+    }
+
+    // Appel de la fonction stockée
+    const { data, error } = await supabase
+      .rpc('manage_owner', {
+        p_action: 'create',
+        p_company_data: form.value.company,
+        p_address_data: form.value.address,
+        p_owner_data: ownerData
       })
-      .select()
-      .single()
 
-    if (ownerError) throw ownerError
+    if (error) throw error
 
-    // 2. Créer les modules
-    const moduleInserts = Object.entries(form.value.modules)
-      .filter(([_, enabled]) => enabled)
-      .map(([name]) => ({
-        owner_id: owner.id,
-        module_name: name,
-        is_active: true,
-        settings: {}
-      }))
-
-    if (moduleInserts.length > 0) {
-      const { error: modulesError } = await supabase
-        .from('owner_modules')
-        .insert(moduleInserts)
-
-      if (modulesError) throw modulesError
+    if (!data.success) {
+      throw new Error(data.error)
     }
 
     toast.success('La société a été créée avec succès')

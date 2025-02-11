@@ -36,7 +36,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import DataTable from '@/components/DataTable/DataTable.vue'
+import DataTable from '@/components/DataTable'
 import VehicleTableFilters from '../components/VehicleTable/VehicleTableFilters.vue'
 import { useVehicles } from '../composables/useVehicles'
 import { useToast } from '@/components/ui/toast/use-toast'

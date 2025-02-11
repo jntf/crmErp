@@ -2,7 +2,7 @@
 <template>
     <Sidebar class="flex flex-col h-screen bg-background border-r">
         <!-- Logo et titre -->
-        <div class="px-4 py-2 bg-gray-200 flex items-center justify-between border-b">
+        <div class="px-4 py-2 flex items-center justify-between border-b">
             <div class="mx-auto">
                 <img src="/logo.png" alt="Logo" class="w-auto h-12" />
             </div>

@@ -17,7 +17,7 @@
               </Badge>
             </div>
             <p class="text-sm text-muted-foreground mt-1">
-              {{ isNew ? 'Créée le ' + formatDate(new Date()) : 'Modifiée le ' + formatDate(order?.updatedAt) }}
+              {{ isNew ? 'Créée le ' + formatDate1(new Date()) : 'Modifiée le ' + formatDate1(order?.updatedAt) }}
             </p>
           </div>
         </div>
@@ -240,7 +240,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeftIcon, PlusIcon, Trash2Icon, DownloadIcon } from 'lucide-vue-next'
 import { useOrderStore } from '../../stores/useOrderStore'
-import { formatCurrency, formatDate } from '~/utils/format'
+import { formatCurrency, formatDate1 } from '~/utils/formatter'
 import type { Order, OrderItem, VehicleCommission, SaleType, OrderFormData, Vehicle } from '../../types'
 import {
   Card,

@@ -89,7 +89,7 @@
 import { ref, computed } from 'vue'
 import { PlusIcon, Trash2Icon } from 'lucide-vue-next'
 import type { VehicleCommission, SaleType, CommissionType } from '../types'
-import { formatCurrency, formatDate } from '~/utils/format'
+import { formatCurrency, formatDate } from '~/utils/formatter'
 import SearchableSelect from '../components/ui/SearchableSelect.vue'
 import {
   Card,

@@ -5,10 +5,16 @@
         <h1 class="text-3xl font-bold">Sociétés</h1>
         <p class="text-muted-foreground">Gérez les sociétés et leurs paramètres</p>
       </div>
-      <Button @click="router.push('/admin/owners/create')">
-        <PlusIcon class="mr-2 h-4 w-4" />
-        Nouvelle société
-      </Button>
+      <div class="flex gap-2">
+        <Button variant="outline" @click="fetchOwners">
+          <RefreshCwIcon class="h-4 w-4 mr-2" />
+          Actualiser
+        </Button>
+        <Button @click="router.push('/admin/owners/create')">
+          <PlusIcon class="mr-2 h-4 w-4" />
+          Nouvelle société
+        </Button>
+      </div>
     </header>
 
     <div class="space-y-4">
@@ -74,6 +80,11 @@
                         <PowerIcon class="mr-2 h-4 w-4" />
                         {{ owner.status === 'active' ? 'Désactiver' : 'Activer' }}
                       </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem @click="confirmDelete(owner)" class="text-destructive">
+                        <Trash2Icon class="mr-2 h-4 w-4" />
+                        Supprimer
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -104,6 +115,35 @@
         </CardContent>
       </Card>
     </div>
+
+    <!-- Dialog de confirmation de suppression -->
+    <Dialog :open="showDeleteDialog" @update:open="showDeleteDialog = false">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Supprimer la société</DialogTitle>
+          <DialogDescription>
+            Êtes-vous sûr de vouloir supprimer la société "{{ ownerToDelete?.name || '' }}" ?
+            Cette action est irréversible et supprimera toutes les données associées.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            @click="showDeleteDialog = false"
+          >
+            Annuler
+          </Button>
+          <Button
+            variant="destructive"
+            :disabled="isLoading"
+            @click="deleteOwner"
+          >
+            <Loader2Icon v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
+            Supprimer
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -119,9 +159,44 @@ import {
   UsersIcon,
   LayoutGridIcon,
   PercentIcon,
-  PowerIcon
+  PowerIcon,
+  Trash2Icon,
+  RefreshCwIcon
 } from 'lucide-vue-next'
-import { toast } from 'vue-sonner'
+import { useToast } from '@/components/ui/toast/use-toast'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+
+// Types
+interface Owner {
+  id: number
+  name: string
+  status: 'active' | 'inactive'
+  company?: {
+    name: string
+    industry?: string
+    email?: string
+    phone?: string
+  }
+  modules: Array<{
+    module_name: string
+    is_active: boolean
+    settings: Record<string, any>
+  }>
+  users: Array<{
+    id: string // UUID
+    role: string
+  }>
+  user_count: number
+  created_at: string
+  updated_at: string
+}
 
 // Définition du middleware
 definePageMeta({
@@ -131,8 +206,10 @@ definePageMeta({
 const router = useRouter()
 const supabase = useSupabaseClient()
 const isLoading = ref(true)
-const owners = ref<any[]>([])
-
+const owners = ref<Owner[]>([])
+const showDeleteDialog = ref(false)
+const ownerToDelete = ref<Owner | null>(null)
+const { toast } = useToast()
 // Formatage de date
 const formatDate = (date: string) => {
   return format(new Date(date), 'dd MMM yyyy', { locale: fr })
@@ -143,21 +220,44 @@ const fetchOwners = async () => {
   try {
     isLoading.value = true
     
-    // Récupérer les sociétés avec leurs modules
+    // Récupérer les sociétés avec leurs modules et utilisateurs
     const { data, error } = await supabase
       .from('owners')
       .select(`
         *,
-        modules:owner_modules(module_name, is_active),
-        user_count:owner_users(count)
+        company:companies(
+          name,
+          industry,
+          email,
+          phone
+        ),
+        modules:owner_modules(
+          module_name,
+          is_active,
+          settings
+        ),
+        users:owner_users(
+          id,
+          role
+        )
       `)
       .order('name')
 
     if (error) throw error
-    owners.value = data || []
+
+    // Transformation des données pour l'affichage
+    owners.value = (data || []).map(owner => ({
+      ...owner,
+      name: owner.company?.name || owner.name,
+      modules: owner.modules.filter((m: any) => m.is_active),
+      user_count: owner.users?.length || 0
+    }))
   } catch (error) {
     console.error('Error fetching owners:', error)
-    toast.error('Impossible de charger les sociétés')
+    toast({
+      title: 'Erreur de chargement des sociétés',
+      description: error instanceof Error ? error.message : 'Une erreur est survenue lors du chargement des sociétés'
+    })
   } finally {
     isLoading.value = false
   }
@@ -178,10 +278,64 @@ const toggleOwnerStatus = async (owner: any) => {
     if (error) throw error
 
     owner.status = newStatus
-    toast.success(`La société a été ${newStatus === 'active' ? 'activée' : 'désactivée'}`)
+      toast({
+        title: `La société a été ${newStatus === 'active' ? 'activée' : 'désactivée'}`,
+        description: 'Le statut de la société a été mis à jour avec succès'
+      })
   } catch (error) {
     console.error('Error toggling owner status:', error)
-    toast.error('Impossible de modifier le statut de la société')
+    toast({
+      title: 'Impossible de modifier le statut de la société',
+      description: 'Une erreur est survenue lors de la modification du statut de la société'
+    })
+  }
+}
+
+// Confirmation de suppression
+const confirmDelete = (owner: any) => {
+  ownerToDelete.value = owner
+  showDeleteDialog.value = true
+}
+
+// Suppression d'une société
+const deleteOwner = async () => {
+  const owner = ownerToDelete.value
+  if (!owner?.id) return
+
+  try {
+    isLoading.value = true
+    
+    // Appel de la fonction RPC
+    const { data, error } = await supabase
+      .rpc('delete_owner', {
+        p_owner_id: owner.id
+      })
+
+    if (error) {
+      console.error('Delete owner error:', error)
+      throw new Error(error.message)
+    }
+
+    if (!data?.success) {
+      throw new Error(data?.error || 'Erreur lors de la suppression')
+    }
+
+    // Suppression locale
+    owners.value = owners.value.filter(o => o.id !== owner.id)
+    showDeleteDialog.value = false
+    ownerToDelete.value = null
+    toast({
+      title: 'La société a été supprimée',
+      description: 'La société a été supprimée avec succès'
+    })
+  } catch (error: any) {
+    console.error('Error deleting owner:', error)
+    toast({
+      title: 'Impossible de supprimer la société',
+      description: error.message || 'Une erreur est survenue lors de la suppression de la société'
+    })
+  } finally {
+    isLoading.value = false
   }
 }
 

@@ -61,7 +61,7 @@
                 </div>
 
                 <div v-if="type.settings" class="mt-2 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div v-for="(value, key) in type.settings" :key="key" class="space-y-1">
+                  <div v-for="(value, key) in type.settings" :key="String(key)" class="space-y-1">
                     <h4 class="font-medium capitalize">{{ formatKey(key) }}</h4>
                     <p class="text-muted-foreground">{{ formatValue(value) }}</p>
                   </div>
@@ -428,26 +428,26 @@ const fetchCommissionTypes = async () => {
   try {
     isLoading.value = true
     
-    // Récupérer l'ID de l'entreprise
-    const { data: owner, error: ownerError } = await supabase
-      .from('owners')
-      .select('id')
-      .single()
-
-    if (ownerError) throw ownerError
-
     // Récupérer les types de commissions avec leurs paramètres
     const { data, error } = await supabase
       .from('commission_types')
       .select(`
         *,
-        settings:owner_commission_settings!inner(settings, is_active)
+        owner_settings:owner_commission_settings(
+          settings,
+          is_active
+        )
       `)
-      .eq('owner_commission_settings.owner_id', owner.id)
       .order('name')
 
     if (error) throw error
-    commissionTypes.value = data || []
+
+    // Transformation des données pour inclure les paramètres de l'owner
+    commissionTypes.value = (data || []).map(type => ({
+      ...type,
+      settings: type.owner_settings?.[0]?.settings || {},
+      is_active: type.owner_settings?.[0]?.is_active || false
+    }))
   } catch (error) {
     console.error('Error fetching commission types:', error)
     toast.error('Impossible de charger les types de commissions')
@@ -460,22 +460,14 @@ const fetchCommissionTypes = async () => {
 const fetchCommissionHistory = async () => {
   try {
     isLoadingHistory.value = true
-    
-    // Récupérer l'ID de l'entreprise
-    const { data: owner, error: ownerError } = await supabase
-      .from('owners')
-      .select('id')
-      .single()
-
-    if (ownerError) throw ownerError
 
     const { data, error } = await supabase
       .from('vehicle_commissions')
       .select(`
         *,
-        commission_type:commission_types(name)
+        commission_type:commission_types(name),
+        beneficiary:contacts(full_name)
       `)
-      .eq('owner_id', owner.id)
       .order('created_at', { ascending: false })
       .limit(100)
 
@@ -506,20 +498,11 @@ const saveConfiguration = async () => {
   try {
     isLoading.value = true
 
-    // Récupérer l'ID de l'entreprise
-    const { data: owner, error: ownerError } = await supabase
-      .from('owners')
-      .select('id')
-      .single()
-
-    if (ownerError) throw ownerError
-
     const { is_active, ...settings } = configForm.value
 
     const { error } = await supabase
       .from('owner_commission_settings')
       .upsert({
-        owner_id: owner.id,
         commission_type_id: selectedType.value.id,
         settings,
         is_active: is_active === 'active',
@@ -540,8 +523,8 @@ const saveConfiguration = async () => {
 }
 
 // Formatage des clés et valeurs
-const formatKey = (key: string) => {
-  return key.replace(/_/g, ' ')
+const formatKey = (key: string | number) => {
+  return String(key).replace(/_/g, ' ')
 }
 
 const formatValue = (value: any) => {
