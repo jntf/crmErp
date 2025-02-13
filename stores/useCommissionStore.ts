@@ -21,26 +21,60 @@ export const useCommissionStore = defineStore('commission', () => {
     types.value.filter(type => type.is_active)
   )
 
-  const getTypeSettings = computed(() => (typeId: number) => 
-    settings.value[typeId] || null
-  )
+  const getTypeSettings = computed(() => (typeId: number) => {
+    console.log('getTypeSettings called for typeId:', typeId)
+    console.log('current settings:', settings.value)
+    return settings.value[typeId] || {
+      is_active: false,
+      settings: {
+        calculationType: 'fixed_amount',
+        percentage: null,
+        fixedAmount: 0,
+        hasMinAmount: false,
+        minAmount: 0,
+        hasMaxAmount: false,
+        maxAmount: null
+      }
+    };
+  })
 
   // Actions
   const fetchCurrentOwnerId = async () => {
-    if (!user.value) return null
+    console.log('fetchCurrentOwnerId called, user:', user.value)
+    if (!user.value) {
+      console.warn('No user found, authentication required')
+      return null
+    }
 
     try {
+      console.log('Fetching owner ID for user:', user.value.id)
+      
+      // D'abord, essayons de récupérer depuis la table users
       const { data, error: err } = await supabase
         .from('users')
-        .select('owner_id')
+        .select('owner_id, email')
         .eq('id', user.value.id)
         .single()
 
-      if (err) throw err
-      currentOwnerId.value = data?.owner_id || null
-      return data?.owner_id
+      console.log('Users table query result:', { data, err })
+
+      if (err) {
+        console.error('Error fetching from users table:', err)
+        throw err
+      }
+
+      if (!data?.owner_id) {
+        console.warn('No owner_id found for user:', data?.email)
+        error.value = 'Utilisateur non associé à une société'
+        return null
+      }
+
+      console.log('Owner ID found:', data.owner_id)
+      currentOwnerId.value = data.owner_id
+      return data.owner_id
+
     } catch (err) {
-      console.error('Error fetching owner id:', err)
+      console.error('Error in fetchCurrentOwnerId:', err)
       error.value = 'Impossible de récupérer l\'identifiant de la société'
       return null
     }
@@ -128,6 +162,7 @@ export const useCommissionStore = defineStore('commission', () => {
 
   const fetchCommissionSettings = async () => {
     try {
+      console.log('fetchCommissionSettings called with currentOwnerId:', currentOwnerId.value)
       if (!currentOwnerId.value) {
         throw new Error('Aucune société sélectionnée')
       }
@@ -139,30 +174,34 @@ export const useCommissionStore = defineStore('commission', () => {
 
       if (err) throw err
 
+      console.log('Commission settings fetched from DB:', data)
+
       // Réinitialiser les paramètres
       settings.value = {}
       
-      // Mettre à jour les paramètres
+      // Mettre à jour les paramètres en conservant les valeurs exactes de la base de données
       data?.forEach(setting => {
+        console.log('Processing setting for commission_type_id:', setting.commission_type_id)
         settings.value[setting.commission_type_id] = {
           id: setting.id,
           owner_id: setting.owner_id,
           commission_type_id: setting.commission_type_id,
           is_active: setting.is_active,
           settings: setting.settings || {
-            calculationType: 'percentage',
-            percentage: 0,
+            calculationType: 'fixed_amount',
+            percentage: null,
             fixedAmount: 0,
             hasMinAmount: false,
             minAmount: 0,
             hasMaxAmount: false,
-            maxAmount: 0
+            maxAmount: null
           },
           created_at: setting.created_at,
           updated_at: setting.updated_at
         }
       })
 
+      console.log('Updated settings in store:', settings.value)
       return data
     } catch (err) {
       console.error('Error fetching commission settings:', err)
@@ -284,9 +323,26 @@ export const useCommissionStore = defineStore('commission', () => {
 
   // Initialisation
   const initialize = async () => {
+    console.log('Store initialization started')
     await fetchCurrentOwnerId()
+    console.log('Current owner ID fetched:', currentOwnerId.value)
+    
     if (currentOwnerId.value) {
-      await fetchCommissionTypes()
+      try {
+        await fetchCommissionTypes()
+        console.log('Commission types fetched:', types.value)
+      } catch (error) {
+        console.error('Error fetching commission types:', error)
+      }
+
+      try {
+        await fetchCommissionSettings()
+        console.log('Commission settings fetched')
+      } catch (error) {
+        console.error('Error fetching commission settings:', error)
+      }
+    } else {
+      console.warn('No owner ID found, skipping data fetch')
     }
   }
 

@@ -40,11 +40,8 @@
                       <h3 class="font-medium">{{ type.name }}</h3>
                       <div class="flex items-center space-x-4">
                         <div class="flex items-center space-x-2">
-                          <Switch 
-                            :id="'switch-' + type.id" 
-                            :checked="type.is_active"
-                            @update:checked="toggleTypeStatus(type)"
-                          />
+                          <Switch :id="'switch-' + type.id" :checked="type.is_active"
+                            @update:checked="toggleTypeStatus(type)" />
                           <Label :for="'switch-' + type.id" class="text-sm text-muted-foreground">
                             {{ type.is_active ? 'Actif' : 'Inactif' }}
                           </Label>
@@ -78,15 +75,16 @@
                             <template v-for="(value, key) in type.settings_schema" :key="key">
                               <div v-if="value" class="inline-flex items-center space-x-1 text-sm">
                                 <CheckIcon class="h-3 w-3 text-primary" />
-                                <span>{{ 
+                                <span>{{
                                   {
                                     'percentage': 'Pourcentage',
                                     'fixed_amount': 'Montant fixe',
                                     'min_amount': 'Montant minimum',
                                     'max_amount': 'Montant maximum'
-                                  }[key as keyof CommissionTypeSchema] || key 
+                                  }[key as keyof CommissionTypeSchema] || key
                                 }}</span>
-                                <span v-if="Object.entries(type.settings_schema).filter(([_, v]) => v).indexOf([key, value]) < Object.entries(type.settings_schema).filter(([_, v]) => v).length - 1">&middot;</span>
+                                <span
+                                  v-if="Object.entries(type.settings_schema).filter(([_, v]) => v).indexOf([key, value]) < Object.entries(type.settings_schema).filter(([_, v]) => v).length - 1">&middot;</span>
                               </div>
                             </template>
                           </div>
@@ -95,8 +93,7 @@
                           <span class="text-sm font-medium">Entreprise(s) Active(s) :</span>
                           <div class="flex items-center space-x-2 mt-1">
                             <span v-for="(owner, index) in type.active_owners || []" :key="owner.id" class="text-sm">
-                              {{ owner.name }}{{ index < (type.active_owners?.length || 0) - 1 ? ',' : '' }}
-                            </span>
+                              {{ owner.name }}{{ index < (type.active_owners?.length || 0) - 1 ? ',' : '' }} </span>
                           </div>
                         </div>
                       </div>
@@ -140,39 +137,19 @@
               <Label>Paramètres disponibles</Label>
               <div class="space-y-2">
                 <div class="flex items-center space-x-2">
-                  <input 
-                    type="checkbox" 
-                    v-model="form.settings.percentage" 
-                    id="percentage" 
-                    class="rounded" 
-                  />
+                  <input type="checkbox" v-model="form.settings.percentage" id="percentage" class="rounded" />
                   <Label for="percentage">Pourcentage</Label>
                 </div>
                 <div class="flex items-center space-x-2">
-                  <input 
-                    type="checkbox" 
-                    v-model="form.settings.fixed_amount" 
-                    id="fixed_amount" 
-                    class="rounded" 
-                  />
+                  <input type="checkbox" v-model="form.settings.fixed_amount" id="fixed_amount" class="rounded" />
                   <Label for="fixed_amount">Montant fixe</Label>
                 </div>
                 <div class="flex items-center space-x-2">
-                  <input 
-                    type="checkbox" 
-                    v-model="form.settings.min_amount" 
-                    id="min_amount" 
-                    class="rounded" 
-                  />
+                  <input type="checkbox" v-model="form.settings.min_amount" id="min_amount" class="rounded" />
                   <Label for="min_amount">Montant minimum</Label>
                 </div>
                 <div class="flex items-center space-x-2">
-                  <input 
-                    type="checkbox" 
-                    v-model="form.settings.max_amount" 
-                    id="max_amount" 
-                    class="rounded" 
-                  />
+                  <input type="checkbox" v-model="form.settings.max_amount" id="max_amount" class="rounded" />
                   <Label for="max_amount">Montant maximum</Label>
                 </div>
               </div>
@@ -437,115 +414,19 @@ const onSubmit = async () => {
       max_amount: Boolean(form.settings.max_amount)
     }
 
-    const commissionTypeData: CommissionTypeData = {
-      name: form.name,
-      description: form.description,
-      code: form.name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-      settings_schema: settingsSchema,
-      is_active: true,
-      updated_at: new Date().toISOString()
-    }
-
-    if (editingType.value) {
-      // Mise à jour du type
-      const updateData = {
-        name: commissionTypeData.name,
-        description: commissionTypeData.description,
-        code: commissionTypeData.code,
+    const { data, error } = await supabase.rpc('upsert_commission_type', {
+      p_data: {
+        id: editingType.value?.id,
+        name: form.name,
+        description: form.description,
+        code: form.name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
         settings_schema: settingsSchema,
-        is_active: commissionTypeData.is_active,
-        updated_at: commissionTypeData.updated_at
+        is_active: true,
+        owner_ids: form.selected_owners.map(id => parseInt(id))
       }
+    })
 
-      console.log('Données envoyées à Supabase:', JSON.stringify(updateData, null, 2))
-
-      const { error } = await supabase
-        .from('commission_types')
-        .update(updateData)
-        .eq('id', editingType.value.id)
-
-      if (error) {
-        console.error('Erreur Supabase:', error)
-        throw error
-      }
-
-      // Vérification de la mise à jour
-      const { data: updatedType, error: checkError } = await supabase
-        .from('commission_types')
-        .select('*')
-        .eq('id', editingType.value.id)
-        .single()
-
-      if (checkError) throw checkError
-      console.log('Type mis à jour:', JSON.stringify(updatedType, null, 2))
-
-      // Mise à jour des owners autorisés
-      await supabase
-        .from('owner_commission_settings')
-        .delete()
-        .eq('commission_type_id', editingType.value.id)
-
-      if (form.selected_owners.length > 0) {
-        const ownerSettings: OwnerCommissionSettings[] = form.selected_owners.map((ownerId: string) => ({
-          owner_id: parseInt(ownerId),
-          commission_type_id: editingType.value!.id,
-          is_active: true,
-          settings: {
-            calculationType: 'percentage',
-            percentage: 0,
-            fixedAmount: 0,
-            hasMinAmount: false,
-            minAmount: 0,
-            hasMaxAmount: false,
-            maxAmount: 0,
-            is_active: true
-          }
-        }))
-
-        const { error: insertError } = await supabase
-          .from('owner_commission_settings')
-          .insert(ownerSettings)
-
-        if (insertError) throw insertError
-      }
-    } else {
-      // Création du type
-      const { data: newType, error } = await supabase
-        .from('commission_types')
-        .insert({
-          ...commissionTypeData,
-          settings_schema: settingsSchema
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      // Création des associations avec les owners
-      if (form.selected_owners.length > 0 && newType) {
-        const ownerSettings: OwnerCommissionSettings[] = form.selected_owners.map((ownerId: string) => ({
-          owner_id: parseInt(ownerId),
-          commission_type_id: newType.id,
-          is_active: true,
-          settings: {
-            calculationType: 'percentage',
-            percentage: 0,
-            fixedAmount: 0,
-            hasMinAmount: false,
-            minAmount: 0,
-            hasMaxAmount: false,
-            maxAmount: 0,
-            is_active: true
-          }
-        }))
-
-        const { error: insertError } = await supabase
-          .from('owner_commission_settings')
-          .insert(ownerSettings)
-
-        if (insertError) throw insertError
-      }
-    }
+    if (error) throw error
 
     showCreateDialog.value = false
     editingType.value = null

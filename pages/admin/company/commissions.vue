@@ -40,6 +40,16 @@
               </div>
             </div>
 
+            <div v-else-if="!currentOwnerId" class="text-center py-6">
+              <div class="space-y-2">
+                <BuildingIcon class="mx-auto h-12 w-12 text-muted-foreground/50" />
+                <h3 class="font-medium">Aucune société associée</h3>
+                <p class="text-sm text-muted-foreground">
+                  Votre compte n'est pas associé à une société
+                </p>
+              </div>
+            </div>
+
             <div v-else class="divide-y">
               <div v-for="type in commissionTypes" :key="type.id" class="py-4">
                 <div class="flex items-center justify-between">
@@ -65,13 +75,21 @@
                     <h4 class="font-medium">Type de calcul</h4>
                     <p class="text-muted-foreground">{{ formatCalculationType(getTypeSettings(type.id)?.settings.calculationType) }}</p>
                   </div>
-                  <div class="space-y-1">
+                  <div v-if="getTypeSettings(type.id)?.settings.calculationType === 'percentage' || getTypeSettings(type.id)?.settings.calculationType === 'mixed'" class="space-y-1">
                     <h4 class="font-medium">Pourcentage</h4>
-                    <p class="text-muted-foreground">{{ getTypeSettings(type.id)?.settings.percentage }}%</p>
+                    <p class="text-muted-foreground">{{ getTypeSettings(type.id)?.settings.percentage ?? 0 }}%</p>
                   </div>
-                  <div class="space-y-1">
+                  <div v-if="getTypeSettings(type.id)?.settings.calculationType === 'fixed_amount' || getTypeSettings(type.id)?.settings.calculationType === 'mixed'" class="space-y-1">
                     <h4 class="font-medium">Montant fixe</h4>
-                    <p class="text-muted-foreground">{{ formatMoneyValue(getTypeSettings(type.id)?.settings.fixedAmount || 0) }}</p>
+                    <p class="text-muted-foreground">{{ formatMoneyValue(getTypeSettings(type.id)?.settings.fixedAmount ?? 0) }}</p>
+                  </div>
+                  <div v-if="getTypeSettings(type.id)?.settings.hasMinAmount" class="space-y-1">
+                    <h4 class="font-medium">Montant minimum</h4>
+                    <p class="text-muted-foreground">{{ formatMoneyValue(getTypeSettings(type.id)?.settings.minAmount ?? 0) }}</p>
+                  </div>
+                  <div v-if="getTypeSettings(type.id)?.settings.hasMaxAmount" class="space-y-1">
+                    <h4 class="font-medium">Montant maximum</h4>
+                    <p class="text-muted-foreground">{{ formatMoneyValue(getTypeSettings(type.id)?.settings.maxAmount ?? 0) }}</p>
                   </div>
                 </div>
               </div>
@@ -93,88 +111,23 @@
         
         <form @submit.prevent="saveConfiguration" class="space-y-4">
           <div class="space-y-4">
-            <div v-if="selectedType?.settings_schema.percentage || selectedType?.settings_schema.fixed_amount" class="space-y-2">
-              <Label>Type de calcul</Label>
-              <Select v-model="formState.calculationType">
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionnez le type de calcul" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem 
-                    v-if="selectedType?.settings_schema.percentage" 
-                    value="percentage"
-                  >
-                    Pourcentage
-                  </SelectItem>
-                  <SelectItem 
-                    v-if="selectedType?.settings_schema.fixed_amount" 
-                    value="fixed"
-                  >
-                    Montant fixe
-                  </SelectItem>
-                  <SelectItem 
-                    v-if="selectedType?.settings_schema.percentage && selectedType?.settings_schema.fixed_amount" 
-                    value="mixed"
-                  >
-                    Mixte
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div v-if="selectedType?.settings_schema.percentage && 
-              (formState.calculationType === 'percentage' || formState.calculationType === 'mixed')" 
-              class="space-y-2"
-            >
-              <Label>Pourcentage</Label>
-              <Input 
-                v-model="formState.percentage"
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
-              />
-            </div>
-
-            <div v-if="selectedType?.settings_schema.fixed_amount && 
-              (formState.calculationType === 'fixed' || formState.calculationType === 'mixed')" 
-              class="space-y-2"
-            >
-              <Label>Montant fixe</Label>
-              <Input 
-                v-model="formState.fixedAmount"
-                type="number"
-                step="0.01"
-                min="0"
-              />
-            </div>
-
-            <div v-if="selectedType?.settings_schema.min_amount" class="space-y-2">
-              <div class="flex items-center space-x-2">
-                <Switch v-model="formState.hasMinAmount" id="has-min-amount" />
-                <Label for="has-min-amount">Montant minimum</Label>
+            <div v-if="selectedType">
+              <div v-if="selectedType?.settings_schema.percentage" class="space-y-2">
+                <Label>Pourcentage</Label>
+                <Input v-model.number="formState.percentage" type="number" step="0.01" min="0" max="100" />
               </div>
-              <Input 
-                v-if="formState.hasMinAmount"
-                v-model="formState.minAmount"
-                type="number"
-                step="0.01"
-                min="0"
-              />
-            </div>
-
-            <div v-if="selectedType?.settings_schema.max_amount" class="space-y-2">
-              <div class="flex items-center space-x-2">
-                <Switch v-model="formState.hasMaxAmount" id="has-max-amount" />
-                <Label for="has-max-amount">Montant maximum</Label>
+              <div v-if="selectedType?.settings_schema.fixed_amount" class="space-y-2">
+                <Label>Montant fixe</Label>
+                <Input v-model.number="formState.fixedAmount" type="number" step="0.01" min="0" />
               </div>
-              <Input 
-                v-if="formState.hasMaxAmount"
-                v-model="formState.maxAmount"
-                type="number"
-                step="0.01"
-                min="0"
-              />
+              <div v-if="selectedType?.settings_schema.min_amount" class="space-y-2">
+                <Label>Montant minimum</Label>
+                <Input v-model.number="formState.minAmount" type="number" step="0.01" min="0" />
+              </div>
+              <div v-if="selectedType?.settings_schema.max_amount" class="space-y-2">
+                <Label>Montant maximum</Label>
+                <Input v-model.number="formState.maxAmount" type="number" step="0.01" min="0" />
+              </div>
             </div>
 
             <div class="space-y-2">
@@ -208,12 +161,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { 
   Loader2Icon,
   PercentIcon,
   WrenchIcon,
-  RefreshCwIcon
+  RefreshCwIcon,
+  BuildingIcon
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import {
@@ -262,48 +216,54 @@ const isLoading = computed(() => commissionStore.isLoading)
 const showConfigDialog = ref(false)
 const commissionTypes = computed(() => commissionStore.types)
 const selectedType = ref<CommissionType | null>(null)
+const currentOwnerId = computed(() => commissionStore.currentOwnerId)
+
+// Ajout des watches pour suivre les changements
+watch(commissionTypes, (newTypes) => {
+  console.log('commissionTypes changed:', newTypes)
+}, { deep: true })
+
+watch(() => commissionStore.settings, (newSettings) => {
+  console.log('settings changed in store:', newSettings)
+}, { deep: true })
 
 // État du formulaire
-const formState = reactive<CommissionFormState>({
-  calculationType: 'percentage',
+const formState = reactive({
   percentage: 0,
   fixedAmount: 0,
-  hasMinAmount: false,
   minAmount: 0,
-  hasMaxAmount: false,
   maxAmount: 0,
   is_active: false
 })
 
 // Configuration d'une commission
 const configureCommission = (type: CommissionType) => {
+  console.log('configureCommission called with type:', type)
   selectedType.value = type
   const typeSettings = commissionStore.getTypeSettings(type.id)
+  console.log('typeSettings fetched:', typeSettings)
   
-  // Réinitialiser le formulaire avec les valeurs par défaut
   const defaultState = {
-    calculationType: type.settings_schema.percentage ? 'percentage' : 'fixed',
     percentage: 0,
     fixedAmount: 0,
-    hasMinAmount: false,
     minAmount: 0,
-    hasMaxAmount: false,
     maxAmount: 0,
     is_active: false
   }
 
-  // Si des paramètres existent déjà, les utiliser
   if (typeSettings) {
+    console.log('Applying existing settings:', typeSettings.settings)
     Object.assign(formState, {
       ...defaultState,
       ...typeSettings.settings,
       is_active: typeSettings.is_active
     })
   } else {
-    // Sinon utiliser les valeurs par défaut
+    console.log('Using default state')
     Object.assign(formState, defaultState)
   }
   
+  console.log('Final formState:', formState)
   showConfigDialog.value = true
 }
 
@@ -313,23 +273,19 @@ const saveConfiguration = async () => {
 
   try {
     const schema = selectedType.value.settings_schema
-    const { is_active, ...formValues } = formState
-    
-    // Préparer les settings en fonction du schema
     const settings = {
-      calculationType: formValues.calculationType,
-      percentage: schema.percentage ? formValues.percentage : 0,
-      fixedAmount: schema.fixed_amount ? formValues.fixedAmount : 0,
-      hasMinAmount: schema.min_amount ? formValues.hasMinAmount : false,
-      minAmount: schema.min_amount ? formValues.minAmount : 0,
-      hasMaxAmount: schema.max_amount ? formValues.hasMaxAmount : false,
-      maxAmount: schema.max_amount ? formValues.maxAmount : 0
+      percentage: schema.percentage ? formState.percentage : undefined,
+      fixedAmount: schema.fixed_amount ? formState.fixedAmount : undefined,
+      minAmount: schema.min_amount ? formState.minAmount : undefined,
+      maxAmount: schema.max_amount ? formState.maxAmount : undefined,
+      hasMinAmount: schema.min_amount ? (formState.minAmount > 0) : false,
+      hasMaxAmount: schema.max_amount ? (formState.maxAmount > 0) : false
     }
     
     await commissionStore.updateCommissionSettings(
       selectedType.value.id,
       settings,
-      is_active
+      formState.is_active
     )
 
     showConfigDialog.value = false
@@ -348,7 +304,15 @@ const refreshData = async () => {
 
 // Initialisation
 onMounted(async () => {
+  console.log('Component mounted')
   await commissionStore.initialize()
+  console.log('Store initialized, currentOwnerId:', commissionStore.currentOwnerId)
+  if (commissionStore.currentOwnerId) {
+    await refreshData()
+    console.log('Data refreshed')
+  } else {
+    console.warn('No owner ID available, skipping data refresh')
+  }
 })
 
 // Formatage des valeurs
@@ -362,13 +326,16 @@ const formatMoneyValue = (amount: number) => {
 const formatCalculationType = (type: string | undefined) => {
   const types = {
     percentage: 'Pourcentage',
-    fixed: 'Montant fixe',
+    fixed_amount: 'Montant fixe',
     mixed: 'Mixte'
   }
   return types[type as keyof typeof types] || type
 }
 
 const getTypeSettings = (typeId: number) => {
-  return commissionStore.getTypeSettings(typeId)
+  console.log('getTypeSettings called in component for typeId:', typeId)
+  const settings = commissionStore.getTypeSettings(typeId)
+  console.log('settings returned for typeId:', typeId, settings)
+  return settings
 }
 </script> 
