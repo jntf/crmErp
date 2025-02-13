@@ -46,8 +46,8 @@
                   <div class="space-y-1">
                     <h3 class="font-medium">{{ type.name }}</h3>
                     <div class="flex items-center space-x-2 text-sm text-muted-foreground">
-                      <Badge :variant="type.is_active ? 'default' : 'secondary'">
-                        {{ type.is_active ? 'Actif' : 'Inactif' }}
+                      <Badge :variant="getTypeSettings(type.id)?.is_active ? 'default' : 'secondary'">
+                        {{ getTypeSettings(type.id)?.is_active ? 'Actif' : 'Inactif' }}
                       </Badge>
                       <span>·</span>
                       <span>{{ type.description }}</span>
@@ -60,113 +60,20 @@
                   </Button>
                 </div>
 
-                <div v-if="type.settings" class="mt-2 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div v-for="(value, key) in type.settings" :key="String(key)" class="space-y-1">
-                    <h4 class="font-medium capitalize">{{ formatKey(key) }}</h4>
-                    <p class="text-muted-foreground">{{ formatValue(value) }}</p>
+                <div v-if="getTypeSettings(type.id)?.settings" class="mt-2 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div class="space-y-1">
+                    <h4 class="font-medium">Type de calcul</h4>
+                    <p class="text-muted-foreground">{{ formatCalculationType(getTypeSettings(type.id)?.settings.calculationType) }}</p>
+                  </div>
+                  <div class="space-y-1">
+                    <h4 class="font-medium">Pourcentage</h4>
+                    <p class="text-muted-foreground">{{ getTypeSettings(type.id)?.settings.percentage }}%</p>
+                  </div>
+                  <div class="space-y-1">
+                    <h4 class="font-medium">Montant fixe</h4>
+                    <p class="text-muted-foreground">{{ formatMoneyValue(getTypeSettings(type.id)?.settings.fixedAmount || 0) }}</p>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <!-- Historique des commissions -->
-      <Card>
-        <CardHeader>
-          <CardTitle>Historique des commissions</CardTitle>
-          <CardDescription>
-            Consultez l'historique des commissions générées
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div class="w-full">
-            <div class="flex items-center py-4">
-              <Input
-                class="max-w-sm"
-                placeholder="Rechercher..."
-                :model-value="table.getColumn('beneficiary')?.getFilterValue() as string"
-                @update:model-value="table.getColumn('beneficiary')?.setFilterValue($event)"
-              />
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button variant="outline" class="ml-auto">
-                    Colonnes <ChevronDownIcon class="ml-2 h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuCheckboxItem
-                    v-for="column in table.getAllColumns().filter((column) => column.getCanHide())"
-                    :key="column.id"
-                    class="capitalize"
-                    :checked="column.getIsVisible()"
-                    @update:checked="(value) => {
-                      column.toggleVisibility(!!value)
-                    }"
-                  >
-                    {{ column.id }}
-                  </DropdownMenuCheckboxItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <div class="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
-                    <TableHead v-for="header in headerGroup.headers" :key="header.id">
-                      <FlexRender v-if="!header.isPlaceholder" :render="header.column.columnDef.header" :props="header.getContext()" />
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow v-if="isLoadingHistory">
-                    <TableCell :colspan="columns.length" class="h-24 text-center">
-                      <Loader2Icon class="mx-auto h-4 w-4 animate-spin" />
-                    </TableCell>
-                  </TableRow>
-                  <template v-else-if="table.getRowModel().rows?.length">
-                    <TableRow 
-                      v-for="row in table.getRowModel().rows" 
-                      :key="row.id"
-                    >
-                      <TableCell v-for="cell in row.getVisibleCells()" :key="cell.id">
-                        <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
-                      </TableCell>
-                    </TableRow>
-                  </template>
-                  <TableRow v-else>
-                    <TableCell
-                      :colspan="columns.length"
-                      class="h-24 text-center"
-                    >
-                      Aucune commission
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-            <div class="flex items-center justify-end space-x-2 py-4">
-              <div class="flex-1 text-sm text-muted-foreground">
-                {{ table.getFilteredRowModel().rows.length }} commission(s)
-              </div>
-              <div class="space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  :disabled="!table.getCanPreviousPage()"
-                  @click="table.previousPage()"
-                >
-                  Précédent
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  :disabled="!table.getCanNextPage()"
-                  @click="table.nextPage()"
-                >
-                  Suivant
-                </Button>
               </div>
             </div>
           </div>
@@ -185,54 +92,96 @@
         </DialogHeader>
         
         <form @submit.prevent="saveConfiguration" class="space-y-4">
-          <div v-if="selectedType?.settings_schema" class="space-y-4">
-            <div v-for="(field, key) in selectedType.settings_schema" :key="key" class="space-y-2">
-              <Label>{{ field.description }}</Label>
-              
-              <Input 
-                v-if="field.type === 'number'"
-                v-model="configForm[key]"
-                type="number"
-                step="0.01"
-                :required="field.required"
-              />
-
-              <Select 
-                v-else-if="field.type === 'select'"
-                v-model="configForm[key]"
-              >
+          <div class="space-y-4">
+            <div v-if="selectedType?.settings_schema.percentage || selectedType?.settings_schema.fixed_amount" class="space-y-2">
+              <Label>Type de calcul</Label>
+              <Select v-model="formState.calculationType">
                 <SelectTrigger>
-                  <SelectValue :placeholder="field.description" />
+                  <SelectValue placeholder="Sélectionnez le type de calcul" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem 
-                    v-for="option in field.options" 
-                    :key="option.value"
-                    :value="option.value"
+                    v-if="selectedType?.settings_schema.percentage" 
+                    value="percentage"
                   >
-                    {{ option.label }}
+                    Pourcentage
+                  </SelectItem>
+                  <SelectItem 
+                    v-if="selectedType?.settings_schema.fixed_amount" 
+                    value="fixed"
+                  >
+                    Montant fixe
+                  </SelectItem>
+                  <SelectItem 
+                    v-if="selectedType?.settings_schema.percentage && selectedType?.settings_schema.fixed_amount" 
+                    value="mixed"
+                  >
+                    Mixte
                   </SelectItem>
                 </SelectContent>
               </Select>
+            </div>
 
-              <Switch
-                v-else-if="field.type === 'boolean'"
-                v-model="configForm[key]"
-                :id="key"
+            <div v-if="selectedType?.settings_schema.percentage && 
+              (formState.calculationType === 'percentage' || formState.calculationType === 'mixed')" 
+              class="space-y-2"
+            >
+              <Label>Pourcentage</Label>
+              <Input 
+                v-model="formState.percentage"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+              />
+            </div>
+
+            <div v-if="selectedType?.settings_schema.fixed_amount && 
+              (formState.calculationType === 'fixed' || formState.calculationType === 'mixed')" 
+              class="space-y-2"
+            >
+              <Label>Montant fixe</Label>
+              <Input 
+                v-model="formState.fixedAmount"
+                type="number"
+                step="0.01"
+                min="0"
+              />
+            </div>
+
+            <div v-if="selectedType?.settings_schema.min_amount" class="space-y-2">
+              <div class="flex items-center space-x-2">
+                <Switch v-model="formState.hasMinAmount" id="has-min-amount" />
+                <Label for="has-min-amount">Montant minimum</Label>
+              </div>
+              <Input 
+                v-if="formState.hasMinAmount"
+                v-model="formState.minAmount"
+                type="number"
+                step="0.01"
+                min="0"
+              />
+            </div>
+
+            <div v-if="selectedType?.settings_schema.max_amount" class="space-y-2">
+              <div class="flex items-center space-x-2">
+                <Switch v-model="formState.hasMaxAmount" id="has-max-amount" />
+                <Label for="has-max-amount">Montant maximum</Label>
+              </div>
+              <Input 
+                v-if="formState.hasMaxAmount"
+                v-model="formState.maxAmount"
+                type="number"
+                step="0.01"
+                min="0"
               />
             </div>
 
             <div class="space-y-2">
-              <Label>Statut</Label>
-              <Select v-model="configForm.is_active">
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionnez un statut" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Actif</SelectItem>
-                  <SelectItem value="inactive">Inactif</SelectItem>
-                </SelectContent>
-              </Select>
+              <div class="flex items-center space-x-2">
+                <Switch v-model="formState.is_active" id="is-active" />
+                <Label for="is-active">Activer ce type de commission</Label>
+              </div>
             </div>
           </div>
 
@@ -259,35 +208,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
-import { format } from 'date-fns'
-import { fr } from 'date-fns/locale'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { 
   Loader2Icon,
   PercentIcon,
   WrenchIcon,
-  RefreshCwIcon,
-  ChevronDownIcon,
-  ArrowUpDown
+  RefreshCwIcon
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import type {
-  ColumnDef,
-  ColumnFiltersState,
-  SortingState,
-  VisibilityState,
-  Row,
-  Column,
-} from '@tanstack/vue-table'
-import {
-  FlexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useVueTable,
-} from '@tanstack/vue-table'
-import { valueUpdater } from '@/utils'
 import {
   Select,
   SelectContent,
@@ -315,22 +243,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { formatCurrency, safeToString, safeToNumber } from '@/utils/formatter'
-import type { Commission, CommissionType, CommissionRow, CommissionColumn, CommissionValue } from '@/types/commission'
+
+import type { 
+  CommissionType, 
+  CommissionSettings, 
+  CommissionFormState
+} from '@/types/commission'
+import { useCommissionStore } from '@/stores/useCommissionStore'
 
 definePageMeta({
   middleware: ['admin']
@@ -338,156 +257,53 @@ definePageMeta({
 
 // État
 const supabase = useSupabaseClient()
-const isLoading = ref(false)
-const isLoadingHistory = ref(false)
+const commissionStore = useCommissionStore()
+const isLoading = computed(() => commissionStore.isLoading)
 const showConfigDialog = ref(false)
-const commissionTypes = ref<CommissionType[]>([])
-const commissions = ref<Commission[]>([])
+const commissionTypes = computed(() => commissionStore.types)
 const selectedType = ref<CommissionType | null>(null)
-const configForm = ref<{
-  is_active: 'active' | 'inactive'
-  [key: string]: any
-}>({
-  is_active: 'active'
+
+// État du formulaire
+const formState = reactive<CommissionFormState>({
+  calculationType: 'percentage',
+  percentage: 0,
+  fixedAmount: 0,
+  hasMinAmount: false,
+  minAmount: 0,
+  hasMaxAmount: false,
+  maxAmount: 0,
+  is_active: false
 })
-
-const sorting = ref<SortingState>([])
-const columnFilters = ref<ColumnFiltersState>([])
-const columnVisibility = ref<VisibilityState>({})
-
-// Colonnes pour le tableau
-const columns: ColumnDef<Commission>[] = [
-  {
-    accessorKey: 'created_at',
-    header: ({ column }: { column: CommissionColumn }) => {
-      return h(Button, {
-        variant: 'ghost',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc'),
-      }, () => ['Date', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })])
-    },
-    cell: ({ row }: { row: CommissionRow }) => {
-      const date = new Date(row.getValue('created_at'))
-      return format(date, 'dd MMM yyyy', { locale: fr })
-    },
-  },
-  {
-    accessorKey: 'commission_type.name',
-    header: 'Type',
-    cell: ({ row }: { row: CommissionRow }) => {
-      const name = row.getValue('commission_type.name') as string
-      return h('div', { class: 'capitalize' }, name)
-    },
-  },
-  {
-    accessorKey: 'beneficiary',
-    header: 'Bénéficiaire',
-    cell: ({ row }: { row: CommissionRow }) => {
-      const beneficiary = row.getValue('beneficiary') as string
-      return beneficiary
-    },
-  },
-  {
-    accessorKey: 'amount',
-    header: () => h('div', { class: 'text-right' }, 'Montant'),
-    cell: ({ row }: { row: CommissionRow }) => {
-      const value = row.getValue('amount') as CommissionValue
-      const amount = safeToNumber(value)
-      return h('div', { class: 'text-right font-medium' }, formatCurrency(amount))
-    },
-  },
-  {
-    accessorKey: 'status',
-    header: 'Statut',
-    cell: ({ row }: { row: CommissionRow }) => {
-      const status = row.getValue('status') as 'pending' | 'paid'
-      return h('div', { class: 'capitalize' }, status === 'paid' ? 'Payée' : 'En attente')
-    },
-  },
-]
-
-// Configuration de la table
-const table = useVueTable({
-  data: commissions.value,
-  columns,
-  getCoreRowModel: getCoreRowModel(),
-  getPaginationRowModel: getPaginationRowModel(),
-  getSortedRowModel: getSortedRowModel(),
-  getFilteredRowModel: getFilteredRowModel(),
-  onSortingChange: updaterOrValue => valueUpdater(updaterOrValue, sorting),
-  onColumnFiltersChange: updaterOrValue => valueUpdater(updaterOrValue, columnFilters),
-  onColumnVisibilityChange: updaterOrValue => valueUpdater(updaterOrValue, columnVisibility),
-  state: {
-    get sorting() { return sorting.value },
-    get columnFilters() { return columnFilters.value },
-    get columnVisibility() { return columnVisibility.value },
-  },
-})
-
-// Chargement des types de commissions
-const fetchCommissionTypes = async () => {
-  try {
-    isLoading.value = true
-    
-    // Récupérer les types de commissions avec leurs paramètres
-    const { data, error } = await supabase
-      .from('commission_types')
-      .select(`
-        *,
-        owner_settings:owner_commission_settings(
-          settings,
-          is_active
-        )
-      `)
-      .order('name')
-
-    if (error) throw error
-
-    // Transformation des données pour inclure les paramètres de l'owner
-    commissionTypes.value = (data || []).map(type => ({
-      ...type,
-      settings: type.owner_settings?.[0]?.settings || {},
-      is_active: type.owner_settings?.[0]?.is_active || false
-    }))
-  } catch (error) {
-    console.error('Error fetching commission types:', error)
-    toast.error('Impossible de charger les types de commissions')
-  } finally {
-    isLoading.value = false
-  }
-}
-
-// Chargement de l'historique des commissions
-const fetchCommissionHistory = async () => {
-  try {
-    isLoadingHistory.value = true
-
-    const { data, error } = await supabase
-      .from('vehicle_commissions')
-      .select(`
-        *,
-        commission_type:commission_types(name),
-        beneficiary:contacts(full_name)
-      `)
-      .order('created_at', { ascending: false })
-      .limit(100)
-
-    if (error) throw error
-    commissions.value = data || []
-  } catch (error) {
-    console.error('Error fetching commission history:', error)
-    toast.error('Impossible de charger l\'historique des commissions')
-  } finally {
-    isLoadingHistory.value = false
-  }
-}
 
 // Configuration d'une commission
 const configureCommission = (type: CommissionType) => {
   selectedType.value = type
-  configForm.value = {
-    ...type.settings,
-    is_active: type.settings.is_active ? 'active' : 'inactive'
+  const typeSettings = commissionStore.getTypeSettings(type.id)
+  
+  // Réinitialiser le formulaire avec les valeurs par défaut
+  const defaultState = {
+    calculationType: type.settings_schema.percentage ? 'percentage' : 'fixed',
+    percentage: 0,
+    fixedAmount: 0,
+    hasMinAmount: false,
+    minAmount: 0,
+    hasMaxAmount: false,
+    maxAmount: 0,
+    is_active: false
   }
+
+  // Si des paramètres existent déjà, les utiliser
+  if (typeSettings) {
+    Object.assign(formState, {
+      ...defaultState,
+      ...typeSettings.settings,
+      is_active: typeSettings.is_active
+    })
+  } else {
+    // Sinon utiliser les valeurs par défaut
+    Object.assign(formState, defaultState)
+  }
+  
   showConfigDialog.value = true
 }
 
@@ -496,55 +312,63 @@ const saveConfiguration = async () => {
   if (!selectedType.value) return
 
   try {
-    isLoading.value = true
-
-    const { is_active, ...settings } = configForm.value
-
-    const { error } = await supabase
-      .from('owner_commission_settings')
-      .upsert({
-        commission_type_id: selectedType.value.id,
-        settings,
-        is_active: is_active === 'active',
-        updated_at: new Date().toISOString()
-      })
-
-    if (error) throw error
+    const schema = selectedType.value.settings_schema
+    const { is_active, ...formValues } = formState
+    
+    // Préparer les settings en fonction du schema
+    const settings = {
+      calculationType: formValues.calculationType,
+      percentage: schema.percentage ? formValues.percentage : 0,
+      fixedAmount: schema.fixed_amount ? formValues.fixedAmount : 0,
+      hasMinAmount: schema.min_amount ? formValues.hasMinAmount : false,
+      minAmount: schema.min_amount ? formValues.minAmount : 0,
+      hasMaxAmount: schema.max_amount ? formValues.hasMaxAmount : false,
+      maxAmount: schema.max_amount ? formValues.maxAmount : 0
+    }
+    
+    await commissionStore.updateCommissionSettings(
+      selectedType.value.id,
+      settings,
+      is_active
+    )
 
     showConfigDialog.value = false
     toast.success('Configuration enregistrée')
-    refreshData()
+    await refreshData()
   } catch (error) {
     console.error('Error saving commission configuration:', error)
     toast.error('Impossible de sauvegarder la configuration')
-  } finally {
-    isLoading.value = false
   }
 }
 
-// Formatage des clés et valeurs
-const formatKey = (key: string | number) => {
-  return String(key).replace(/_/g, ' ')
+// Rafraîchissement des données
+const refreshData = async () => {
+  await commissionStore.fetchCommissionTypes()
 }
 
-const formatValue = (value: any) => {
-  if (typeof value === 'number') {
-    return value.toFixed(2)
-  }
-  if (typeof value === 'boolean') {
-    return value ? 'Oui' : 'Non'
-  }
-  return value
-}
-
-// Actualisation des données
-const refreshData = () => {
-  fetchCommissionTypes()
-  fetchCommissionHistory()
-}
-
-// Chargement initial
-onMounted(() => {
-  refreshData()
+// Initialisation
+onMounted(async () => {
+  await commissionStore.initialize()
 })
+
+// Formatage des valeurs
+const formatMoneyValue = (amount: number) => {
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR'
+  }).format(amount)
+}
+
+const formatCalculationType = (type: string | undefined) => {
+  const types = {
+    percentage: 'Pourcentage',
+    fixed: 'Montant fixe',
+    mixed: 'Mixte'
+  }
+  return types[type as keyof typeof types] || type
+}
+
+const getTypeSettings = (typeId: number) => {
+  return commissionStore.getTypeSettings(typeId)
+}
 </script> 

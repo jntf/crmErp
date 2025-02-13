@@ -279,6 +279,10 @@ const store = useOrderStore()
 
 // Récupérer le type de vente depuis la query si nouvelle commande
 const saleTypeFromQuery = computed(() => route.query.type as SaleType | undefined)
+const vehicleIdsFromQuery = computed(() => {
+    const ids = route.query.vehicles as string
+    return ids ? ids.split(',') : []
+})
 
 const orderId = computed(() => route.params.id === 'new' ? null : Number(route.params.id))
 const isNew = computed(() => !orderId.value)
@@ -576,19 +580,29 @@ const downloadPdf = async () => {
 }
 
 onMounted(async () => {
-  try {
-    console.log('Starting to fetch data...')
-    await Promise.all([
-      fetchOrder(),
-      fetchReferences()
-    ])
-    console.log('References loaded:', {
-      contacts: contacts.value,
-      companies: companies.value,
-      vehicles: vehicles.value
-    })
-  } catch (error) {
-    console.error('Erreur lors du chargement des données:', error)
-  }
+    try {
+        console.log('Starting to fetch data...')
+        await Promise.all([
+            fetchOrder(),
+            fetchReferences()
+        ])
+        console.log('References loaded:', {
+            contacts: contacts.value,
+            companies: companies.value,
+            vehicles: vehicles.value
+        })
+
+        // Si on a des véhicules en paramètre, les ajouter automatiquement
+        if (isNew.value && vehicleIdsFromQuery.value.length > 0) {
+            const selectedVehicles = vehicles.value.filter(v => 
+                vehicleIdsFromQuery.value.includes(v.id)
+            )
+            if (selectedVehicles.length > 0) {
+                addVehicles(selectedVehicles)
+            }
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement des données:', error)
+    }
 })
 </script>

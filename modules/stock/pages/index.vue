@@ -699,8 +699,25 @@ const handleChangeSupplier = async () => {
     showSupplierModal.value = true
 }
 
-const handleCreateOrder = async () => {
-    // TODO: Implémenter la création de bon de commande
+const handleCreateOrder = () => {
+    if (selectedVehicles.value.length === 0) {
+        toast({
+            title: "Aucun véhicule sélectionné",
+            description: "Veuillez sélectionner au moins un véhicule",
+            variant: "destructive"
+        })
+        return
+    }
+    
+    // Redirection vers la création de commande avec les véhicules sélectionnés
+    const vehicleIds = selectedVehicles.value.map(v => v.id)
+    router.push({
+        path: '/orders/new',
+        query: {
+            vehicles: vehicleIds.join(','),
+            type: 'B2B' // Type par défaut pour une commande depuis le stock
+        }
+    })
 }
 
 const handleSupplierSelected = async () => {
