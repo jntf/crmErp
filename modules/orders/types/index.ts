@@ -14,54 +14,73 @@ export interface Company {
 }
 
 export interface Vehicle {
-  id: string
+  id: number
   internal_id: string
   brand: string
   model: string
-  version?: string
-  color?: string
-  vin?: string
-  registration_number?: string
-  mileage?: number
-  year?: number
-  vehicle_prices?: {
-    purchase_price_ht: number
-    selling_price_ht: number
-    frevo: number
-  }
+  vin: string
 }
 
 export interface OrderItem {
   id: number
-  orderId: number
-  vehicleId: string
-  vehicleInternalId: string
-  quantity: number
-  purchasePriceHt: number
-  unitPriceHt: number
-  sellingPriceHt: number
-  tvaRate: number
-  totalHt: number
-  totalTva: number
-  totalTtc: number
-  isPaid: boolean
-  status: OrderStatus
-  isDelivered: boolean
-  metadata?: Record<string, any>
   vehicle?: Vehicle
+  sellingPriceHt: number
 }
 
-export interface VehicleCommission {
+export interface Recipient {
   id: number
-  orderItemId: number
-  amount: number
+  name: string
+}
+
+export interface CommissionFormData {
+  applyToAll: boolean
+  order_item_id: number | null
+  commission_type_id: number | null
   rate: number
-  beneficiaryId: number
-  commissionType: CommissionType
-  isPaid: boolean
-  paymentDate?: Date
-  metadata?: Record<string, any>
-  beneficiary?: Company | Contact
+  amount: number
+  recipientType: 'owner' | 'contact' | 'company' | null
+  recipientId: number | null
+}
+
+export interface VehicleCommissionCreate {
+  order_item_id: number
+  commission_type_id: number
+  rate: number
+  amount: number
+  recipient_type: 'owner' | 'contact' | 'company'
+  recipient_id: number
+}
+
+export interface VehicleCommission extends VehicleCommissionCreate {
+  id: number
+  recipient?: Recipient
+  order_item?: {
+    id: number
+    vehicle_id: number
+    vehicle: Vehicle
+  }
+}
+
+export type CommissionBeneficiaryType = 'owner' | 'contact' | 'company'
+
+export interface CommissionTypeConfig {
+  id: number
+  name: string
+  code: string
+  description: string
+  settings_schema: {
+    percentage: boolean
+    fixed_amount: boolean
+    min_amount: boolean
+    max_amount: boolean
+  }
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  active_owners: Array<{
+    id: number
+    name: string
+  }>
 }
 
 export interface Order {

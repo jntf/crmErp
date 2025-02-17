@@ -82,6 +82,28 @@ export interface CommissionStore {
   toggleCommissionTypeStatus: (id: number, isActive: boolean) => Promise<void>
 }
 
+export interface VehicleCommission {
+  id: number
+  recipient_type: 'owner' | 'contact' | 'company'
+  recipient_id: number
+  order_item_id: number | null
+  amount: number
+  recipient?: {
+    id: number
+    name: string
+  }
+  order_item?: {
+    id: number
+    vehicle_id: number
+    vehicle: {
+      id: number
+      internal_id: string
+      model: string
+      vin: string
+    }
+  }
+}
+
 export type { Owner as OwnerType }
 export type { CommissionTypeSchema as CommissionTypeSchemaType }
 export type { CommissionType as CommissionTypeType }
@@ -91,4 +113,5 @@ export type { OwnerCommissionSettings as OwnerCommissionSettingsType }
 export type { CommissionTypeResponse as CommissionTypeResponseType }
 export type { CommissionTypeData as CommissionTypeDataType }
 export type { CommissionFormData as CommissionFormDataType }
-export type { CommissionStore as CommissionStoreType } 
+export type { CommissionStore as CommissionStoreType }
+export type { VehicleCommission as VehicleCommissionType } 

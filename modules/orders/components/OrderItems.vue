@@ -1,37 +1,30 @@
 <template>
   <Card>
     <CardHeader class="flex justify-between items-center">
-      <CardTitle>Véhicules</CardTitle>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        @click="showVehicleSelector = true"
-      >
-        <Icon name="heroicons:plus" class="mr-2 h-4 w-4" />
+      <CardTitle class="text-base font-semibold">Véhicules</CardTitle>
+      <Button type="button" variant="outline" size="sm" @click="openVehicleSelector">
+        <PlusIcon class="h-4 w-4 mr-2" />
         Ajouter
       </Button>
     </CardHeader>
-    <CardContent>
+    <CardContent class="p-0">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Référence</TableHead>
-            <TableHead>Désignation</TableHead>
-            <TableHead>Quantité</TableHead>
-            <TableHead>Prix unitaire HT</TableHead>
-            <TableHead>Prix de vente HT</TableHead>
-            <TableHead>TVA</TableHead>
-            <TableHead>Total TTC</TableHead>
-            <TableHead></TableHead>
+          <TableRow class="bg-muted/50 hover:bg-muted/50">
+            <TableHead class="text-xs font-medium">Référence</TableHead>
+            <TableHead class="text-xs font-medium">Désignation</TableHead>
+            <TableHead class="text-xs font-medium w-24 text-center">Quantité</TableHead>
+            <TableHead class="text-xs font-medium w-32 text-right">Prix d'achat HT</TableHead>
+            <TableHead class="text-xs font-medium w-32 text-right">Prix de vente HT</TableHead>
+            <TableHead class="text-xs font-medium w-24 text-center">TVA</TableHead>
+            <TableHead class="text-xs font-medium w-32 text-right">Total TTC</TableHead>
+            <TableHead class="text-xs font-medium w-32 text-right">Marge</TableHead>
+            <TableHead class="w-10"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow
-            v-for="(item, index) in modelValue"
-            :key="item.vehicleId"
-          >
-            <TableCell>{{ item.vehicleInternalId }}</TableCell>
+          <TableRow v-for="(item, index) in modelValue" :key="item.vehicleId" class="text-xs">
+            <TableCell>{{ item.vehicle?.internal_id }}</TableCell>
             <TableCell>
               {{ item.vehicle?.brand }} {{ item.vehicle?.model }} {{ item.vehicle?.version }}
               <div class="text-xs text-muted-foreground">
@@ -39,64 +32,74 @@
               </div>
             </TableCell>
             <TableCell class="text-center">
-              <Input v-model.number="item.quantity" type="number" min="1" class="w-16 h-8 text-xs text-center"
-                @input="updateItemTotals(index)" />
+              <Input 
+                v-model.number="item.quantity" 
+                type="number" 
+                min="1" 
+                class="w-16 h-8 text-xs text-center"
+                @input="updateItem(index)" 
+              />
             </TableCell>
             <TableCell class="text-right font-medium">
               {{ formatCurrency(item.purchasePriceHt) }}
             </TableCell>
             <TableCell class="text-right">
-              <Input v-model.number="item.sellingPriceHt" type="number" min="0" step="0.01"
-                class="w-24 h-8 text-xs text-right" @input="updateItemTotals(index)" />
+              <Input 
+                v-model.number="item.sellingPriceHt" 
+                type="number" 
+                min="0" 
+                step="0.01"
+                class="w-24 h-8 text-xs text-right" 
+                @input="updateItem(index)" 
+              />
             </TableCell>
             <TableCell class="text-center">
-              <Input v-model.number="item.tvaRate" type="number" min="0" max="100" step="0.1"
-                class="w-16 h-8 text-xs text-center" @input="updateItemTotals(index)" />
+              <Input 
+                v-model.number="item.tvaRate" 
+                type="number" 
+                min="0" 
+                max="100" 
+                step="0.1"
+                class="w-16 h-8 text-xs text-center" 
+                @input="updateItem(index)" 
+              />
             </TableCell>
-            <TableCell class="text-right font-medium">{{ formatCurrency(item.totalTtc) }}</TableCell>
+            <TableCell class="text-right font-medium">
+              {{ formatCurrency(getItemTotals(item).totalTtc) }}
+            </TableCell>
+            <TableCell class="text-right font-medium">
+              {{ formatCurrency(getItemTotals(item).margin) }}
+            </TableCell>
             <TableCell>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="icon" 
+                class="h-8 w-8" 
                 @click="removeItem(index)"
               >
-                <Icon name="heroicons:trash" class="h-4 w-4 text-red-500" />
+                <Trash2Icon class="h-4 w-4 text-red-500" />
               </Button>
             </TableCell>
           </TableRow>
         </TableBody>
-        <tfoot>
-          <tr>
-            <td colspan="5" class="text-right font-medium pr-4">Total HT</td>
-            <td>{{ formatCurrency(totalHt) }}</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td colspan="5" class="text-right font-medium pr-4">TVA</td>
-            <td>{{ formatCurrency(totalTva) }}</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td colspan="5" class="text-right font-bold pr-4">Total TTC</td>
-            <td class="font-bold">{{ formatCurrency(totalTtc) }}</td>
-            <td></td>
-          </tr>
-        </tfoot>
       </Table>
     </CardContent>
-
-    <VehicleSelector
-      v-model="showVehicleSelector"
-      @select="addVehicles"
-    />
   </Card>
+
+  <VehicleSelector 
+    v-model="showVehicleSelectorDialog" 
+    :vehicles="vehicles" 
+    @select="addVehicles" 
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import type { OrderItem, Vehicle } from '../types'
+import { ref } from 'vue'
+import { PlusIcon, Trash2Icon } from 'lucide-vue-next'
 import { formatCurrency } from '~/utils/formatter'
+import type { OrderItem, Vehicle } from '../types'
+import { useOrderCalculations } from '../composables/useOrderCalculations'
 import VehicleSelector from './VehicleSelector.vue'
 import {
   Card,
@@ -115,36 +118,31 @@ import {
 
 const props = defineProps<{
   modelValue: OrderItem[]
+  vehicles: Vehicle[]
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: OrderItem[]): void
+  'update:modelValue': [value: OrderItem[]]
 }>()
 
-const showVehicleSelector = ref(false)
+const showVehicleSelectorDialog = ref(false)
 
-const totalHt = computed(() => {
-  return props.modelValue.reduce((sum, item) => sum + item.totalHt, 0)
-})
+// Utilisation du composable pour les calculs
+const { calculateItemTotals } = useOrderCalculations(ref(props.modelValue))
 
-const totalTva = computed(() => {
-  return props.modelValue.reduce((sum, item) => sum + item.totalTva, 0)
-})
+const getItemTotals = (item: OrderItem) => {
+  return calculateItemTotals(item)
+}
 
-const totalTtc = computed(() => {
-  return totalHt.value + totalTva.value
-})
-
-const updateItemTotals = (index: number) => {
+const updateItem = (index: number) => {
   const items = [...props.modelValue]
   const item = items[index]
-  
   if (!item) return
 
-  // Calcul des totaux de l'article
-  item.totalHt = item.quantity * item.sellingPriceHt
-  item.totalTva = item.totalHt * (item.tvaRate / 100)
-  item.totalTtc = item.totalHt + item.totalTva
+  const totals = calculateItemTotals(item)
+  item.totalHt = totals.totalHt
+  item.totalTva = totals.totalTva
+  item.totalTtc = totals.totalTtc
 
   emit('update:modelValue', items)
 }
@@ -155,11 +153,14 @@ const removeItem = (index: number) => {
   emit('update:modelValue', items)
 }
 
-const addVehicles = (vehicles: Vehicle[]) => {
+const openVehicleSelector = () => {
+  showVehicleSelectorDialog.value = true
+}
+
+const addVehicles = (selectedVehicles: Vehicle[]) => {
   const items = [...props.modelValue]
-  
-  vehicles.forEach(vehicle => {
-    // Vérifier si le véhicule n'est pas déjà dans la liste
+
+  selectedVehicles.forEach(vehicle => {
     if (!items.some(item => item.vehicleId === vehicle.id)) {
       items.push({
         id: 0,
@@ -168,6 +169,7 @@ const addVehicles = (vehicles: Vehicle[]) => {
         vehicleInternalId: vehicle.internal_id,
         quantity: 1,
         purchasePriceHt: vehicle.vehicle_prices?.purchase_price_ht || 0,
+        unitPriceHt: vehicle.vehicle_prices?.selling_price_ht || 0,
         sellingPriceHt: vehicle.vehicle_prices?.selling_price_ht || 0,
         tvaRate: 20,
         totalHt: 0,
@@ -179,11 +181,6 @@ const addVehicles = (vehicles: Vehicle[]) => {
         vehicle
       })
     }
-  })
-
-  // Calculer les totaux pour les nouveaux articles
-  items.forEach((item, index) => {
-    updateItemTotals(index)
   })
 
   emit('update:modelValue', items)

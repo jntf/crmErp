@@ -1,206 +1,183 @@
 <template>
-  <Card>
-    <CardHeader class="flex justify-between items-center">
-      <CardTitle class="text-base font-semibold">Commissions</CardTitle>
-      <Button type="button" variant="outline" size="sm" @click="addCommission">
-        <PlusIcon class="h-4 w-4 mr-2" />
-        Ajouter
-      </Button>
+  <Card class="w-full">
+    <CardHeader>
+      <div class="flex items-center justify-between">
+        <CardTitle>Commissions</CardTitle>
+        <Button variant="outline" size="sm" @click="openAddCommissionDialog">
+          <PlusIcon class="w-4 h-4 mr-2" />
+          Ajouter
+        </Button>
+      </div>
     </CardHeader>
-    <CardContent class="p-0">
-      <Table>
-        <TableHeader>
-          <TableRow class="bg-muted/50 hover:bg-muted/50">
-            <TableHead class="text-xs font-medium">Type</TableHead>
-            <TableHead class="text-xs font-medium">Bénéficiaire</TableHead>
-            <TableHead class="text-xs font-medium w-24 text-center">Taux (%)</TableHead>
-            <TableHead class="text-xs font-medium w-32 text-right">Montant</TableHead>
-            <TableHead class="text-xs font-medium w-32 text-center">Statut</TableHead>
-            <TableHead class="text-xs font-medium">Date de paiement</TableHead>
-            <TableHead class="w-10"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <TableRow v-for="(commission, index) in modelValue" :key="commission.id" class="text-xs">
-            <TableCell>
-              <Select v-model="commission.commissionType">
-                <SelectTrigger class="w-32">
-                  <SelectValue :placeholder="'Type'" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem v-for="type in availableCommissionTypes" :key="type.value" :value="type.value">
-                      {{ type.label }}
-                    </SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </TableCell>
-            <TableCell>
-              <SearchableSelect
-                :model-value="commission.beneficiaryId?.toString()"
-                @update:model-value="updateBeneficiary(commission, $event)"
-                :options="beneficiaryOptions"
-                placeholder="Sélectionner..."
-              />
-            </TableCell>
-            <TableCell class="text-center">
-              <Input
-                v-model.number="commission.rate"
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                class="w-16 h-8 text-xs text-center"
-                @input="updateCommissionAmount(index)"
-              />
-            </TableCell>
-            <TableCell class="text-right font-medium">
-              {{ formatCurrency(commission.amount) }}
-            </TableCell>
-            <TableCell class="text-center">
-              <Badge :variant="commission.isPaid ? 'default' : 'secondary'">
-                {{ commission.isPaid ? 'Payée' : 'En attente' }}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              {{ commission.paymentDate ? formatDate(commission.paymentDate) : '-' }}
-            </TableCell>
-            <TableCell>
-              <Button type="button" variant="ghost" size="icon" class="h-8 w-8" @click="removeCommission(index)">
-                <Trash2Icon class="h-4 w-4 text-red-500" />
-              </Button>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-        <tfoot>
-          <tr>
-            <td colspan="3" class="text-right font-medium pr-4">Total commissions</td>
-            <td class="text-right font-bold">{{ formatCurrency(totalCommissions) }}</td>
-            <td colspan="3"></td>
-          </tr>
-        </tfoot>
-      </Table>
+    <CardContent>
+      <div v-if="groupedCommissions.length > 0" class="space-y-4">
+        <div v-for="group in groupedCommissions" :key="group.recipientKey" class="space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <h3 class="text-lg font-semibold">{{ group.recipientName }}</h3>
+              <Badge>{{ formatCurrency(group.total) }}</Badge>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="removeCommissionGroup(group.commissions)"
+            >
+              <Trash2Icon class="w-4 h-4" />
+            </Button>
+          </div>
+          <div class="pl-4 space-y-1">
+            <div v-for="commission in group.commissions" :key="commission.id" class="text-sm text-gray-600">
+              {{ getVehicleReference(commission.order_item_id) }} - {{ formatCurrency(commission.amount) }}
+              <span class="text-xs text-muted-foreground">(ID: {{ commission.order_item_id }})</span>
+            </div>
+          </div>
+          <Separator />
+        </div>
+      </div>
+      <div v-else class="text-center text-gray-500">
+        Aucune commission
+      </div>
     </CardContent>
   </Card>
+
+  <AddCommissionDialog
+    v-model:open="showAddCommissionDialog"
+    :owner-id="ownerId"
+    :order-items="orderItems"
+    :contacts="contacts"
+    :companies="companies"
+    @update:open="(value) => showAddCommissionDialog = value"
+    @add="handleAddCommission"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from '#imports'
 import { PlusIcon, Trash2Icon } from 'lucide-vue-next'
-import type { VehicleCommission, SaleType, CommissionType } from '../types'
-import { formatCurrency, formatDate } from '~/utils/formatter'
-import SearchableSelect from '../components/ui/SearchableSelect.vue'
+import { formatCurrency } from '~/utils/formatter'
+import { useCommissionStore } from '@/stores/useCommissionStore'
+import { toast } from 'vue-sonner'
+import AddCommissionDialog from './AddCommissionDialog.vue'
+import type { OrderItem, VehicleCommission, Recipient } from '../types'
 import {
   Card,
   CardHeader,
   CardTitle,
   CardContent,
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
   Button,
-  Input,
   Badge,
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
+  Separator
 } from '#components'
 
 const props = defineProps<{
   modelValue: VehicleCommission[]
-  saleType: SaleType
-  totalHt: number
-  contacts: any[]
-  companies: any[]
+  orderItems: OrderItem[]
+  contacts: Recipient[]
+  companies: Recipient[]
+  ownerId?: number
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: VehicleCommission[]): void
+  'update:modelValue': [value: VehicleCommission[]]
 }>()
 
-// Types de commission disponibles selon le type de vente
-const availableCommissionTypes = computed(() => {
-  switch (props.saleType) {
-    case 'B2B2B':
-      return [
-        { value: 'MANDATE', label: 'Mandat' },
-        { value: 'INTERMEDIARY', label: 'Intermédiaire' }
-      ]
-    case 'B2P':
-      return [
-        { value: 'MANDATE', label: 'Mandat' }
-      ]
-    case 'P2P':
-      return [
-        { value: 'PRIVATE_SALE', label: 'Vente particulier' }
-      ]
+const commissionStore = useCommissionStore()
+const showAddCommissionDialog = ref(false)
+
+// Calcul du total des commissions
+const totalCommissions = computed(() => 
+  props.modelValue.reduce((sum, commission) => sum + commission.amount, 0)
+)
+
+interface CommissionGroup {
+  recipientKey: string
+  recipientType: VehicleCommission['recipient_type']
+  recipientId: number
+  recipientName: string
+  commissions: VehicleCommission[]
+  total: number
+}
+
+// Dans la partie script, ajouter le computed pour grouper les commissions
+const groupedCommissions = computed(() => {
+  const groups = props.modelValue.reduce((acc, commission) => {
+    const recipientKey = `${commission.recipient_type}-${commission.recipient_id}`
+    if (!acc[recipientKey]) {
+      acc[recipientKey] = {
+        recipientKey,
+        recipientType: commission.recipient_type,
+        recipientId: commission.recipient_id,
+        recipientName: getRecipientName(commission),
+        commissions: [],
+        total: 0
+      }
+    }
+    acc[recipientKey].commissions.push(commission)
+    acc[recipientKey].total += commission.amount
+    return acc
+  }, {} as Record<string, CommissionGroup>)
+
+  return Object.values(groups)
+})
+
+// Fonction pour obtenir le nom du destinataire
+const getRecipientName = (commission: VehicleCommission) => {
+  switch (commission.recipient_type) {
+    case 'owner':
+      return 'Ma société'
+    case 'contact':
+      const contact = props.contacts.find(c => c.id === commission.recipient_id)
+      return contact?.name || ''
+    case 'company':
+      const company = props.companies.find(c => c.id === commission.recipient_id)
+      return company?.name || ''
     default:
-      return []
+      return ''
   }
-})
-
-// Options pour le sélecteur de bénéficiaire
-const beneficiaryOptions = computed(() => {
-  const options = []
-  
-  // Ajouter les entreprises
-  options.push(...props.companies.map(company => ({
-    value: `company_${company.id}`,
-    label: `🏢 ${company.name}`
-  })))
-  
-  // Ajouter les contacts pour les ventes P2P
-  if (props.saleType === 'P2P') {
-    options.push(...props.contacts.map(contact => ({
-      value: `contact_${contact.id}`,
-      label: `👤 ${contact.name}`
-    })))
-  }
-  
-  return options
-})
-
-const totalCommissions = computed(() => {
-  return props.modelValue.reduce((sum, commission) => sum + commission.amount, 0)
-})
-
-const updateBeneficiary = (commission: VehicleCommission, value: string) => {
-  const [type, id] = value.split('_')
-  commission.beneficiaryId = parseInt(id)
 }
 
-const updateCommissionAmount = (index: number) => {
-  const commission = props.modelValue[index]
-  if (!commission) return
-
-  commission.amount = props.totalHt * (commission.rate / 100)
-  emit('update:modelValue', [...props.modelValue])
+// Helpers pour l'affichage
+const getVehicleReference = (orderItemId: number | null) => {
+  if (!orderItemId) return ''
+  const item = props.orderItems.find(i => i.id === orderItemId)
+  return item?.vehicle?.internal_id || ''
 }
 
-const addCommission = () => {
-  const newCommission: VehicleCommission = {
-    id: 0,
-    orderItemId: 0,
-    amount: 0,
-    rate: 0,
-    beneficiaryId: 0,
-    commissionType: availableCommissionTypes.value[0]?.value as CommissionType,
-    isPaid: false
+// Actions
+const openAddCommissionDialog = () => {
+  if (!props.ownerId) {
+    toast.error('Veuillez sélectionner une société avant d\'ajouter une commission')
+    return
   }
-  
-  emit('update:modelValue', [...props.modelValue, newCommission])
+  showAddCommissionDialog.value = true
 }
 
-const removeCommission = (index: number) => {
-  const commissions = [...props.modelValue]
-  commissions.splice(index, 1)
+// Ajout d'un watcher pour déboguer
+watch(showAddCommissionDialog, (newValue) => {
+  console.log('Dialog state changed:', newValue)
+})
+
+const handleAddCommission = (commission: VehicleCommission | VehicleCommission[]) => {
+  const newCommissions = Array.isArray(commission) ? commission : [commission]
+  const commissions = [...props.modelValue, ...newCommissions]
+  emit('update:modelValue', commissions)
+  showAddCommissionDialog.value = false
+}
+
+// Modifier la fonction removeCommission pour gérer la suppression d'un groupe
+const removeCommissionGroup = (commissionsToRemove: VehicleCommission[]) => {
+  const orderItemIds = commissionsToRemove.map(c => c.order_item_id)
+  const commissions = props.modelValue.filter(c => !orderItemIds.includes(c.order_item_id))
   emit('update:modelValue', commissions)
 }
+
+// Ajout d'un watcher pour déboguer les commissions
+watch(() => props.modelValue, (newValue) => {
+  console.log('Commissions mises à jour:', newValue)
+}, { deep: true })
+
+// Ajout d'un watcher pour déboguer les orderItems
+watch(() => props.orderItems, (newValue) => {
+  console.log('OrderItems disponibles:', newValue)
+}, { deep: true })
 </script> 

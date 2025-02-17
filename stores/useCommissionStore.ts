@@ -4,16 +4,17 @@ import type {
   CommissionSettings,
   CommissionFormState
 } from '@/types/commission'
+import { useOwnerStore } from '@/stores/useOwnerStore'
 
 export const useCommissionStore = defineStore('commission', () => {
   const supabase = useSupabaseClient()
-  const user = useSupabaseUser()
+  const ownerStore = useOwnerStore()
 
   // États
   const types = ref<CommissionType[]>([])
   const settings = ref<Record<number, CommissionSettings>>({})
   const isLoading = ref(false)
-  const currentOwnerId = ref<number | null>(null)
+  const currentOwnerId = computed(() => ownerStore.idOwnerActuel)
   const error = ref<string | null>(null)
 
   // Getters
@@ -22,8 +23,6 @@ export const useCommissionStore = defineStore('commission', () => {
   )
 
   const getTypeSettings = computed(() => (typeId: number) => {
-    console.log('getTypeSettings called for typeId:', typeId)
-    console.log('current settings:', settings.value)
     return settings.value[typeId] || {
       is_active: false,
       settings: {
@@ -40,44 +39,10 @@ export const useCommissionStore = defineStore('commission', () => {
 
   // Actions
   const fetchCurrentOwnerId = async () => {
-    console.log('fetchCurrentOwnerId called, user:', user.value)
-    if (!user.value) {
-      console.warn('No user found, authentication required')
-      return null
+    if (!ownerStore.idOwnerActuel) {
+      await ownerStore.chargerDonneesOwner()
     }
-
-    try {
-      console.log('Fetching owner ID for user:', user.value.id)
-      
-      // D'abord, essayons de récupérer depuis la table users
-      const { data, error: err } = await supabase
-        .from('users')
-        .select('owner_id, email')
-        .eq('id', user.value.id)
-        .single()
-
-      console.log('Users table query result:', { data, err })
-
-      if (err) {
-        console.error('Error fetching from users table:', err)
-        throw err
-      }
-
-      if (!data?.owner_id) {
-        console.warn('No owner_id found for user:', data?.email)
-        error.value = 'Utilisateur non associé à une société'
-        return null
-      }
-
-      console.log('Owner ID found:', data.owner_id)
-      currentOwnerId.value = data.owner_id
-      return data.owner_id
-
-    } catch (err) {
-      console.error('Error in fetchCurrentOwnerId:', err)
-      error.value = 'Impossible de récupérer l\'identifiant de la société'
-      return null
-    }
+    return ownerStore.idOwnerActuel
   }
 
   interface OwnerSettingsResponse {
@@ -162,7 +127,6 @@ export const useCommissionStore = defineStore('commission', () => {
 
   const fetchCommissionSettings = async () => {
     try {
-      console.log('fetchCommissionSettings called with currentOwnerId:', currentOwnerId.value)
       if (!currentOwnerId.value) {
         throw new Error('Aucune société sélectionnée')
       }
@@ -174,14 +138,11 @@ export const useCommissionStore = defineStore('commission', () => {
 
       if (err) throw err
 
-      console.log('Commission settings fetched from DB:', data)
-
       // Réinitialiser les paramètres
       settings.value = {}
       
       // Mettre à jour les paramètres en conservant les valeurs exactes de la base de données
       data?.forEach(setting => {
-        console.log('Processing setting for commission_type_id:', setting.commission_type_id)
         settings.value[setting.commission_type_id] = {
           id: setting.id,
           owner_id: setting.owner_id,
@@ -201,7 +162,6 @@ export const useCommissionStore = defineStore('commission', () => {
         }
       })
 
-      console.log('Updated settings in store:', settings.value)
       return data
     } catch (err) {
       console.error('Error fetching commission settings:', err)
@@ -240,7 +200,7 @@ export const useCommissionStore = defineStore('commission', () => {
 
       const { data, error: err } = await supabase
         .from('owner_commission_settings')
-        .upsert(updatedSettings)
+        .upsert(updatedSettings, { onConflict: 'owner_id,commission_type_id' })
         .select()
         .single()
 
@@ -321,23 +281,61 @@ export const useCommissionStore = defineStore('commission', () => {
     }
   }
 
+  const toggleTypeStatus = async (typeId: number) => {
+    try {
+      if (!currentOwnerId.value) {
+        throw new Error('Aucune société sélectionnée')
+      }
+
+      const typeSettings = getTypeSettings.value(typeId)
+      const currentStatus = typeSettings?.is_active || false
+      
+      const { error: err } = await supabase
+        .from('owner_commission_settings')
+        .upsert({
+          owner_id: currentOwnerId.value,
+          commission_type_id: typeId,
+          is_active: !currentStatus,
+          settings: typeSettings?.settings || {
+            calculationType: 'percentage',
+            percentage: 0,
+            fixedAmount: 0,
+            hasMinAmount: false,
+            minAmount: 0,
+            hasMaxAmount: false,
+            maxAmount: 0
+          },
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'owner_id,commission_type_id'
+        })
+
+      if (err) throw err
+
+      // Rafraîchir les données
+      await fetchCommissionTypes()
+
+      return { success: true, newStatus: !currentStatus }
+    } catch (err) {
+      console.error('Error toggling commission settings status:', err)
+      error.value = 'Impossible de modifier le statut du type'
+      throw err
+    }
+  }
+
   // Initialisation
   const initialize = async () => {
-    console.log('Store initialization started')
     await fetchCurrentOwnerId()
-    console.log('Current owner ID fetched:', currentOwnerId.value)
     
     if (currentOwnerId.value) {
       try {
         await fetchCommissionTypes()
-        console.log('Commission types fetched:', types.value)
       } catch (error) {
         console.error('Error fetching commission types:', error)
       }
 
       try {
         await fetchCommissionSettings()
-        console.log('Commission settings fetched')
       } catch (error) {
         console.error('Error fetching commission settings:', error)
       }
@@ -365,6 +363,7 @@ export const useCommissionStore = defineStore('commission', () => {
     fetchCommissionSettings,
     updateCommissionSettings,
     calculateCommission,
-    deleteCommissionType
+    deleteCommissionType,
+    toggleTypeStatus
   }
 }) 

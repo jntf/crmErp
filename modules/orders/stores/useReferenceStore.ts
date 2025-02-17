@@ -23,11 +23,16 @@ export const useReferenceStore = defineStore('orderReferences', {
       try {
         const { data, error } = await useSupabaseClient()
           .from('contacts')
-          .select('id, name')
-          .order('name')
+          .select('id, last_name, first_name')
+          .order('last_name')
 
         if (error) throw error
-        this.contacts = data as Contact[]
+        this.contacts = data.map(contact => ({
+          id: contact.id,
+          name: `${contact.first_name} ${contact.last_name}`.trim(),
+          first_name: contact.first_name,
+          last_name: contact.last_name
+        })) as Contact[]
       } catch (error) {
         this.error = (error as PostgrestError).message
       } finally {
@@ -55,7 +60,6 @@ export const useReferenceStore = defineStore('orderReferences', {
     async fetchVehicles() {
       this.loading = true
       try {
-        console.log('Fetching vehicles...')
         const { data, error } = await useSupabaseClient()
           .from('vehicles')
           .select(`
@@ -82,7 +86,6 @@ export const useReferenceStore = defineStore('orderReferences', {
           throw error
         }
         
-        console.log('Raw vehicles data:', data)
         this.vehicles = (data as any[]).map(vehicle => ({
           id: vehicle.id,
           internal_id: vehicle.internal_id,
@@ -100,7 +103,7 @@ export const useReferenceStore = defineStore('orderReferences', {
             frevo: vehicle.vehicle_prices?.frevo
           }
         }))
-        console.log('Processed vehicles:', this.vehicles)
+
       } catch (error) {
         console.error('Error in fetchVehicles:', error)
         this.error = (error as PostgrestError).message

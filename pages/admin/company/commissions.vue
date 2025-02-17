@@ -56,17 +56,19 @@
                   <div class="space-y-1">
                     <h3 class="font-medium">{{ type.name }}</h3>
                     <div class="flex items-center space-x-2 text-sm text-muted-foreground">
-                      <Badge :variant="getTypeSettings(type.id)?.is_active ? 'default' : 'secondary'">
-                        {{ getTypeSettings(type.id)?.is_active ? 'Actif' : 'Inactif' }}
-                      </Badge>
+                      <Switch 
+                        :id="'switch-' + type.id" 
+                        :checked="getTypeSettings(type.id)?.is_active" 
+                        @update:checked="toggleTypeStatus(type)" 
+                      />
+                      <span>{{ getTypeSettings(type.id)?.is_active ? 'Actif' : 'Inactif' }}</span>
                       <span>·</span>
                       <span>{{ type.description }}</span>
                     </div>
                   </div>
 
                   <Button variant="outline" size="sm" @click="configureCommission(type)">
-                    <WrenchIcon class="h-4 w-4 mr-2" />
-                    Configurer
+                    <WrenchIcon class="h-4 w-4" />
                   </Button>
                 </div>
 
@@ -109,31 +111,79 @@
           </DialogDescription>
         </DialogHeader>
         
-        <form @submit.prevent="saveConfiguration" class="space-y-4">
-          <div class="space-y-4">
-            <div v-if="selectedType">
+        <form @submit.prevent="saveConfiguration" class="space-y-6">
+          <div class="space-y-6">
+            <div v-if="selectedType" class="grid grid-cols-2 gap-6">
               <div v-if="selectedType?.settings_schema.percentage" class="space-y-2">
                 <Label>Pourcentage</Label>
-                <Input v-model.number="formState.percentage" type="number" step="0.01" min="0" max="100" />
+                <div class="relative">
+                  <Input 
+                    v-model="formState.percentageInput"
+                    type="text"
+                    placeholder="0.00"
+                    class="pr-8"
+                    :class="{ 'border-destructive': percentageError }"
+                    @input="validatePercentage"
+                  />
+                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                </div>
+                <p v-if="percentageError" class="text-sm text-destructive">
+                  {{ percentageError }}
+                </p>
               </div>
+
               <div v-if="selectedType?.settings_schema.fixed_amount" class="space-y-2">
                 <Label>Montant fixe</Label>
-                <Input v-model.number="formState.fixedAmount" type="number" step="0.01" min="0" />
+                <div class="relative">
+                  <Input 
+                    v-model="formState.fixedAmountInput"
+                    type="text"
+                    placeholder="0.00"
+                    class="pl-6"
+                    :class="{ 'border-destructive': fixedAmountError }"
+                    @input="validateFixedAmount"
+                  />
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">€</span>
+                </div>
+                <p v-if="fixedAmountError" class="text-sm text-destructive">
+                  {{ fixedAmountError }}
+                </p>
               </div>
+
               <div v-if="selectedType?.settings_schema.min_amount" class="space-y-2">
                 <Label>Montant minimum</Label>
-                <Input v-model.number="formState.minAmount" type="number" step="0.01" min="0" />
+                <div class="relative">
+                  <Input 
+                    v-model="formState.minAmountInput"
+                    type="text"
+                    placeholder="0.00"
+                    class="pl-6"
+                    :class="{ 'border-destructive': minAmountError }"
+                    @input="validateMinAmount"
+                  />
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">€</span>
+                </div>
+                <p v-if="minAmountError" class="text-sm text-destructive">
+                  {{ minAmountError }}
+                </p>
               </div>
+
               <div v-if="selectedType?.settings_schema.max_amount" class="space-y-2">
                 <Label>Montant maximum</Label>
-                <Input v-model.number="formState.maxAmount" type="number" step="0.01" min="0" />
-              </div>
-            </div>
-
-            <div class="space-y-2">
-              <div class="flex items-center space-x-2">
-                <Switch v-model="formState.is_active" id="is-active" />
-                <Label for="is-active">Activer ce type de commission</Label>
+                <div class="relative">
+                  <Input 
+                    v-model="formState.maxAmountInput"
+                    type="text"
+                    placeholder="0.00"
+                    class="pl-6"
+                    :class="{ 'border-destructive': maxAmountError }"
+                    @input="validateMaxAmount"
+                  />
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">€</span>
+                </div>
+                <p v-if="maxAmountError" class="text-sm text-destructive">
+                  {{ maxAmountError }}
+                </p>
               </div>
             </div>
           </div>
@@ -148,7 +198,7 @@
             </Button>
             <Button 
               type="submit"
-              :disabled="isLoading"
+              :disabled="isLoading || hasErrors"
             >
               <Loader2Icon v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
               Enregistrer
@@ -197,6 +247,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
 
 import type { 
   CommissionType, 
@@ -204,6 +255,7 @@ import type {
   CommissionFormState
 } from '@/types/commission'
 import { useCommissionStore } from '@/stores/useCommissionStore'
+import { useOwnerStore } from '@/stores/useOwnerStore'
 
 definePageMeta({
   middleware: ['admin']
@@ -212,23 +264,25 @@ definePageMeta({
 // État
 const supabase = useSupabaseClient()
 const commissionStore = useCommissionStore()
+const ownerStore = useOwnerStore()
 const isLoading = computed(() => commissionStore.isLoading)
 const showConfigDialog = ref(false)
 const commissionTypes = computed(() => commissionStore.types)
 const selectedType = ref<CommissionType | null>(null)
-const currentOwnerId = computed(() => commissionStore.currentOwnerId)
+const currentOwnerId = computed(() => ownerStore.idOwnerActuel)
 
-// Ajout des watches pour suivre les changements
-watch(commissionTypes, (newTypes) => {
-  console.log('commissionTypes changed:', newTypes)
-}, { deep: true })
+// État pour la validation
+const percentageError = ref('')
+const fixedAmountError = ref('')
+const minAmountError = ref('')
+const maxAmountError = ref('')
 
-watch(() => commissionStore.settings, (newSettings) => {
-  console.log('settings changed in store:', newSettings)
-}, { deep: true })
-
-// État du formulaire
+// État du formulaire modifié
 const formState = reactive({
+  percentageInput: '',
+  fixedAmountInput: '',
+  minAmountInput: '',
+  maxAmountInput: '',
   percentage: 0,
   fixedAmount: 0,
   minAmount: 0,
@@ -236,34 +290,121 @@ const formState = reactive({
   is_active: false
 })
 
+// Computed pour vérifier s'il y a des erreurs
+const hasErrors = computed(() => {
+  return Boolean(
+    percentageError.value ||
+    fixedAmountError.value ||
+    minAmountError.value ||
+    maxAmountError.value
+  )
+})
+
+// Fonctions de validation
+const validateNumber = (value: string): number | null => {
+  if (!value) return 0
+  const cleaned = value.replace(/[^\d.,]/g, '').replace(',', '.')
+  const number = parseFloat(cleaned)
+  return isNaN(number) ? null : number
+}
+
+const validatePercentage = () => {
+  const value = validateNumber(formState.percentageInput)
+  if (value === null) {
+    percentageError.value = 'Veuillez entrer un nombre valide'
+  } else if (value < 0 || value > 100) {
+    percentageError.value = 'Le pourcentage doit être entre 0 et 100'
+  } else {
+    percentageError.value = ''
+    formState.percentage = value
+  }
+}
+
+const validateFixedAmount = () => {
+  const value = validateNumber(formState.fixedAmountInput)
+  if (value === null) {
+    fixedAmountError.value = 'Veuillez entrer un montant valide'
+  } else if (value < 0) {
+    fixedAmountError.value = 'Le montant ne peut pas être négatif'
+  } else {
+    fixedAmountError.value = ''
+    formState.fixedAmount = value
+  }
+}
+
+const validateMinAmount = () => {
+  const value = validateNumber(formState.minAmountInput)
+  if (value === null) {
+    minAmountError.value = 'Veuillez entrer un montant valide'
+  } else if (value < 0) {
+    minAmountError.value = 'Le montant ne peut pas être négatif'
+  } else {
+    minAmountError.value = ''
+    formState.minAmount = value
+  }
+}
+
+const validateMaxAmount = () => {
+  const value = validateNumber(formState.maxAmountInput)
+  if (value === null) {
+    maxAmountError.value = 'Veuillez entrer un montant valide'
+  } else if (value < 0) {
+    maxAmountError.value = 'Le montant ne peut pas être négatif'
+  } else if (value < formState.minAmount) {
+    maxAmountError.value = 'Le montant maximum doit être supérieur au montant minimum'
+  } else {
+    maxAmountError.value = ''
+    formState.maxAmount = value
+  }
+}
+
 // Configuration d'une commission
 const configureCommission = (type: CommissionType) => {
-  console.log('configureCommission called with type:', type)
   selectedType.value = type
   const typeSettings = commissionStore.getTypeSettings(type.id)
-  console.log('typeSettings fetched:', typeSettings)
   
-  const defaultState = {
-    percentage: 0,
-    fixedAmount: 0,
-    minAmount: 0,
-    maxAmount: 0,
-    is_active: false
+  // Réinitialiser les erreurs
+  percentageError.value = ''
+  fixedAmountError.value = ''
+  minAmountError.value = ''
+  maxAmountError.value = ''
+
+  // Formater les nombres pour l'affichage
+  const formatNumberForDisplay = (value: number | null | undefined): string => {
+    if (value === null || value === undefined) return ''
+    return value.toString().replace('.', ',')
   }
 
   if (typeSettings) {
-    console.log('Applying existing settings:', typeSettings.settings)
-    Object.assign(formState, {
-      ...defaultState,
-      ...typeSettings.settings,
-      is_active: typeSettings.is_active
-    })
+    // Initialiser avec les valeurs existantes
+    formState.percentageInput = formatNumberForDisplay(typeSettings.settings.percentage)
+    formState.fixedAmountInput = formatNumberForDisplay(typeSettings.settings.fixedAmount)
+    formState.minAmountInput = formatNumberForDisplay(typeSettings.settings.minAmount)
+    formState.maxAmountInput = formatNumberForDisplay(typeSettings.settings.maxAmount)
+    
+    // Initialiser les valeurs numériques
+    formState.percentage = typeSettings.settings.percentage || 0
+    formState.fixedAmount = typeSettings.settings.fixedAmount || 0
+    formState.minAmount = typeSettings.settings.minAmount || 0
+    formState.maxAmount = typeSettings.settings.maxAmount || 0
+    
+    // Initialiser l'état actif
+    formState.is_active = Boolean(typeSettings.is_active)
   } else {
-    console.log('Using default state')
-    Object.assign(formState, defaultState)
+    // Réinitialiser à zéro si pas de configuration existante
+    Object.assign(formState, {
+      percentageInput: '',
+      fixedAmountInput: '',
+      minAmountInput: '',
+      maxAmountInput: '',
+      percentage: 0,
+      fixedAmount: 0,
+      minAmount: 0,
+      maxAmount: 0,
+      is_active: false
+    })
   }
   
-  console.log('Final formState:', formState)
   showConfigDialog.value = true
 }
 
@@ -304,14 +445,14 @@ const refreshData = async () => {
 
 // Initialisation
 onMounted(async () => {
-  console.log('Component mounted')
+  // D'abord charger les données owner
+  await ownerStore.chargerDonneesOwner()
+  
+  // Ensuite initialiser le store des commissions
   await commissionStore.initialize()
-  console.log('Store initialized, currentOwnerId:', commissionStore.currentOwnerId)
-  if (commissionStore.currentOwnerId) {
+  
+  if (ownerStore.idOwnerActuel) {
     await refreshData()
-    console.log('Data refreshed')
-  } else {
-    console.warn('No owner ID available, skipping data refresh')
   }
 })
 
@@ -333,9 +474,16 @@ const formatCalculationType = (type: string | undefined) => {
 }
 
 const getTypeSettings = (typeId: number) => {
-  console.log('getTypeSettings called in component for typeId:', typeId)
   const settings = commissionStore.getTypeSettings(typeId)
-  console.log('settings returned for typeId:', typeId, settings)
   return settings
+}
+
+const toggleTypeStatus = async (type: CommissionType) => {
+  try {
+    await commissionStore.toggleTypeStatus(type.id)
+    toast.success(`Le type ${type.name} a été ${!getTypeSettings(type.id)?.is_active ? 'activé' : 'désactivé'} pour votre société`)
+  } catch (error) {
+    toast.error('Impossible de modifier le statut du type')
+  }
 }
 </script> 

@@ -126,7 +126,10 @@
                 
                 <div class="space-y-2">
                   <Label>Pays</Label>
-                  <Select v-model="form.address.country_id" required>
+                  <Select 
+                    v-model="countryIdModel" 
+                    required
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionnez un pays" />
                     </SelectTrigger>
@@ -134,7 +137,7 @@
                       <SelectItem 
                         v-for="country in countries" 
                         :key="country.id" 
-                        :value="country.id"
+                        :value="String(country.id)"
                       >
                         {{ country.name }}
                       </SelectItem>
@@ -222,6 +225,8 @@
 <script setup lang="ts">
 import { Loader2Icon } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
+import { ref, onMounted, watch, computed } from 'vue'
+import { useOwnerStore } from '~/stores/useOwnerStore'
 
 // Définition du middleware
 definePageMeta({
@@ -232,9 +237,6 @@ const supabase = useSupabaseClient()
 const isLoading = ref(false)
 const countries = ref<any[]>([])
 const currentOwnerId = ref<number | null>(null)
-
-const user = useSupabaseUser()
-console.log("user", user)
 
 // Types
 interface CompanyForm {
@@ -256,7 +258,7 @@ interface AddressForm {
   postal_code: string
   city: string
   state?: string
-  country_id: string
+  country_id: number | null
 }
 
 interface OwnerForm {
@@ -273,18 +275,18 @@ interface FormState {
 }
 
 // État du formulaire
-const form = ref<FormState>({
+const form = ref({
   company: {
     name: '',
     industry: '',
     phone: '',
     email: '',
     website: '',
-    number_of_employees: undefined,
+    number_of_employees: null as number | null,
     tax_number: '',
     vat_number: '',
     description: ''
-  },
+  } as CompanyForm,
   address: {
     street_number: '',
     street_name: '',
@@ -292,14 +294,14 @@ const form = ref<FormState>({
     postal_code: '',
     city: '',
     state: '',
-    country_id: ''
-  },
+    country_id: null
+  } as AddressForm,
   owner: {
     name: '',
-    status: 'active',
-    modules: {},
-    settings: '{}'
-  }
+    status: 'active' as const,
+    modules: {} as Record<string, boolean>,
+    settings: ''
+  } as OwnerForm
 })
 
 // Modules disponibles
@@ -311,66 +313,6 @@ const availableModules = [
   { name: 'hr', label: 'Ressources Humaines' },
   { name: 'analytics', label: 'Analyses' }
 ]
-
-// Chargement des données initiales
-const fetchOwnerData = async () => {
-  try {
-    isLoading.value = true
-
-    // Appel de la fonction stockée
-    const { data, error } = await supabase
-      .rpc('get_owner_data')
-
-    if (error) throw error
-
-    if (!data.success) {
-      throw new Error(data.error)
-    }
-
-    // Mise à jour du formulaire
-    currentOwnerId.value = data.owner.id
-    form.value = {
-      company: {
-        name: data.company.name,
-        industry: data.company.industry || '',
-        phone: data.company.phone || '',
-        email: data.company.email || '',
-        website: data.company.website || '',
-        number_of_employees: data.company.number_of_employees,
-        tax_number: data.company.tax_number || '',
-        vat_number: data.company.vat_number || '',
-        description: data.company.description || ''
-      },
-      address: {
-        street_number: data.address.street_number || '',
-        street_name: data.address.street_name,
-        address_line2: data.address.address_line2 || '',
-        postal_code: data.address.postal_code,
-        city: data.address.city,
-        state: data.address.state || '',
-        country_id: data.address.country_id.toString()
-      },
-      owner: {
-        name: data.owner.name,
-        status: data.owner.status as 'active' | 'inactive',
-        modules: {},
-        settings: JSON.stringify(data.owner.settings, null, 2)
-      }
-    }
-
-    // Mise à jour des modules
-    if (data.modules) {
-      data.modules.forEach((module: any) => {
-        form.value.owner.modules[module.module_name] = module.is_active
-      })
-    }
-  } catch (error: any) {
-    console.error('Error fetching owner data:', error)
-    toast.error(error.message || 'Impossible de charger les données de la société')
-  } finally {
-    isLoading.value = false
-  }
-}
 
 // Mise à jour des modules
 const updateModules = () => {
@@ -462,7 +404,57 @@ onMounted(async () => {
     toast.error('Impossible de charger la liste des pays')
   }
 
-  // Chargement des données de la société
-  await fetchOwnerData()
+  // Chargement des données de la société via le store
+  const ownerStore = useOwnerStore()
+  await ownerStore.chargerDonneesOwner()
+  console.log('Owner ID', ownerStore.idOwnerActuel)
+})
+
+// Ajout d'un watcher pour mettre à jour le formulaire dès que les données du store sont chargées
+watch(() => useOwnerStore().donneesOwner, (nv) => {
+  if (nv) {
+    currentOwnerId.value = nv.owner.id
+    form.value = {
+      company: {
+        name: nv.company.name,
+        industry: nv.company.industry || '',
+        phone: nv.company.phone || '',
+        email: nv.company.email || '',
+        website: nv.company.website || '',
+        number_of_employees: nv.company.number_of_employees,
+        tax_number: nv.company.tax_number || '',
+        vat_number: nv.company.vat_number || '',
+        description: nv.company.description || ''
+      },
+      address: {
+        street_number: nv.address.street_number || '',
+        street_name: nv.address.street_name,
+        address_line2: nv.address.address_line2 || '',
+        postal_code: nv.address.postal_code,
+        city: nv.address.city,
+        state: nv.address.state || '',
+        country_id: nv.address.country_id.toString()
+      },
+      owner: {
+        name: nv.owner.name,
+        status: nv.owner.status,
+        modules: {},
+        settings: JSON.stringify(nv.owner.settings, null, 2)
+      }
+    }
+    if (nv.modules) {
+      nv.modules.forEach((module: any) => {
+        form.value.owner.modules[module.module_name] = module.is_active
+      })
+    }
+  }
+})
+
+// Dans la partie script, après la définition des refs
+const countryIdModel = computed({
+  get: () => form.value.address.country_id ? String(form.value.address.country_id) : '',
+  set: (value: string) => {
+    form.value.address.country_id = value ? Number(value) : null
+  }
 })
 </script> 
