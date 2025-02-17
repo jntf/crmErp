@@ -150,6 +150,7 @@
           <OrderSummary
             :items="form.items"
             :commissions="form.commissions"
+            :display-margin="displayMargin"
           />
         </div>
       </div>
@@ -163,7 +164,16 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeftIcon, DownloadIcon } from 'lucide-vue-next'
 import { useOrderStore } from '../../stores/useOrderStore'
 import { formatDate1 } from '~/utils/formatter'
-import type { Order, OrderItem, VehicleCommission, SaleType } from '../../types'
+import type { 
+  Order, 
+  OrderItem, 
+  VehicleCommission, 
+  SaleType, 
+  OrderStatus,
+  OrderFormData, 
+  OrderWithRelations,
+  Vehicle 
+} from '../../types'
 import { useReferenceData } from '../../composables/useReferenceData'
 import SearchableSelect from '../../components/ui/SearchableSelect.vue'
 import OrderItems from '../../components/OrderItems.vue'
@@ -208,22 +218,10 @@ const saving = ref(false)
 const order = ref<Order | null>(null)
 
 // Initialisation du formulaire avec le type de vente de la query
-const form = ref<{
-  saleType: SaleType
-  contactId?: number
-  buyerCompanyId?: number
-  sellerCompanyId?: number
-  items: OrderItem[]
-  commissions: VehicleCommission[]
-  comments: string
-  totalHt: number
-  totalTva: number
-  totalTtc: number
-  status?: string
-}>({
-  saleType: saleTypeFromQuery.value || '' as SaleType,
-  items: [],
-  commissions: [],
+const form = ref<OrderFormData>({
+  saleType: saleTypeFromQuery.value as SaleType || '' as SaleType,
+  items: [] as OrderItem[],
+  commissions: [] as VehicleCommission[],
   comments: '',
   totalHt: 0,
   totalTva: 0,
@@ -243,7 +241,7 @@ const {
 const saleTypes = [
   { value: 'B2C', label: 'Particulier' },
   { value: 'B2B', label: 'Professionnel' },
-  { value: 'B2B2B', label: 'Inter-professionnel' },
+  { value: 'B2B2B', label: 'Intermediation' },
   { value: 'B2P', label: 'Pro vers Particulier' },
   { value: 'P2P', label: 'Particulier à Particulier' }
 ]
@@ -291,7 +289,7 @@ const fetchOrder = async () => {
   }
 
   try {
-    const data = await store.fetchOrderById(orderId.value)
+    const data = await store.fetchOrderById(orderId.value) as OrderWithRelations
     if (data) {
       order.value = data
       // Remplir le formulaire avec les données de la commande
@@ -301,7 +299,7 @@ const fetchOrder = async () => {
         buyerCompanyId: data.buyerCompanyId,
         sellerCompanyId: data.sellerCompanyId,
         items: data.items || [],
-        commissions: data.commissions || [],
+        commissions: data.items?.flatMap(item => item.commissions || []) || [],
         comments: data.comments || '',
         totalHt: data.totalHt,
         totalTva: data.totalTva,
@@ -319,20 +317,52 @@ const fetchOrder = async () => {
 const saveOrder = async () => {
   saving.value = true
   try {
+    console.log('Début de la sauvegarde de la commande')
     const orderData = {
-      ...form.value,
-      status: isNew.value ? 'DRAFT' : order.value?.status
+      saleType: form.value.saleType,
+      contactId: form.value.contactId,
+      buyerCompanyId: form.value.buyerCompanyId,
+      sellerCompanyId: form.value.sellerCompanyId,
+      items: form.value.items.map(item => ({
+        vehicleId: item.vehicleId,
+        vehicleInternalId: item.vehicleInternalId,
+        quantity: item.quantity,
+        purchasePriceHt: item.purchasePriceHt,
+        unitPriceHt: item.unitPriceHt,
+        sellingPriceHt: item.sellingPriceHt,
+        tvaRate: item.tvaRate,
+        totalHt: item.totalHt,
+        totalTva: item.totalTva,
+        totalTtc: item.totalTtc
+      })),
+      commissions: form.value.commissions.map(commission => ({
+        orderItemId: commission.order_item_id,
+        commissionTypeId: commission.commission_type_id,
+        amount: commission.amount,
+        rate: commission.rate,
+        recipientType: commission.recipient_type,
+        recipientId: commission.recipient_id,
+        metadata: commission.metadata || {}
+      })),
+      comments: form.value.comments,
+      orderDate: new Date().toISOString()
     }
 
-    if (isNew.value) {
-      await store.createOrder(orderData)
-    } else if (orderId.value) {
-      await store.updateOrder(orderId.value, orderData)
-    }
+    console.log('Données préparées pour la sauvegarde:', orderData)
 
-    router.push('/orders')
+    const result = await store.createOrderWithFunction(orderData)
+    console.log('Résultat de la création:', result)
+    
+    if (result?.success) {
+      console.log('Création réussie, redirection vers la liste')
+      router.push('/orders')
+    } else {
+      console.error('Échec de la création:', result?.error)
+      throw new Error(result?.error || 'Erreur lors de la création de la commande')
+    }
   } catch (error) {
-    console.error('Erreur lors de l\'enregistrement:', error)
+    console.error('Erreur détaillée lors de la création de la commande:', error)
+    throw error
   } finally {
     saving.value = false
   }
@@ -382,59 +412,56 @@ const downloadPdf = async () => {
 }
 
 const currentOwnerId = computed(() => ownerStore.idOwnerActuel)
-console.log('currentOwnerId', currentOwnerId.value)
+
+const displayMargin = computed(() => {
+  // Afficher la marge uniquement pour les ventes directes (B2B et B2P)
+  return form.value.saleType === 'B2B' || form.value.saleType === 'B2P'
+})
 
 onMounted(async () => {
-    try {
-        console.log('Starting to fetch data...')
-        // Charger les données owner en premier
-        await ownerStore.chargerDonneesOwner()
+  try {
+    await ownerStore.chargerDonneesOwner()
+    await commissionStore.fetchCommissionTypes()
+    await Promise.all([
+      fetchOrder(),
+      fetchReferences()
+    ])
 
-        // Charger les settings de commission
-        await commissionStore.fetchCommissionTypes()
-        console.log('Commission types loaded:', commissionStore)
-        
-        // Puis charger le reste des données en parallèle
-        await Promise.all([
-            fetchOrder(),
-            fetchReferences()
-        ])
-        
-        console.log('Owner data loaded:', ownerStore.donneesOwner)
-        console.log('References loaded:', {
-            contacts: contacts.value,
-            companies: companies.value,
-            vehicles: vehicles.value
+    if (isNew.value && vehicleIdsFromQuery.value.length > 0) {
+      const selectedVehicles = vehicles.value.filter(v =>
+        vehicleIdsFromQuery.value.includes(v.id.toString())
+      )
+      if (selectedVehicles.length > 0) {
+        form.value.items = selectedVehicles.map(vehicle => {
+          const vehicleWithNullableVin: Vehicle = {
+            ...vehicle,
+            vin: vehicle.vin || null
+          }
+          
+          const item: OrderItem = {
+            id: 0,
+            orderId: 0,
+            vehicleId: vehicle.id.toString(),
+            vehicleInternalId: vehicle.internal_id,
+            quantity: 1,
+            purchasePriceHt: vehicle.vehicle_prices?.purchase_price_ht || 0,
+            unitPriceHt: vehicle.vehicle_prices?.selling_price_ht || 0,
+            sellingPriceHt: vehicle.vehicle_prices?.selling_price_ht || 0,
+            tvaRate: 20,
+            totalHt: 0,
+            totalTva: 0,
+            totalTtc: 0,
+            isPaid: false,
+            status: 'DRAFT',
+            isDelivered: false,
+            vehicle: vehicleWithNullableVin
+          }
+          return item
         })
-
-        // Si on a des véhicules en paramètre, les ajouter automatiquement
-        if (isNew.value && vehicleIdsFromQuery.value.length > 0) {
-            const selectedVehicles = vehicles.value.filter(v => 
-                vehicleIdsFromQuery.value.includes(v.id)
-            )
-            if (selectedVehicles.length > 0) {
-                form.value.items = selectedVehicles.map(vehicle => ({
-                    id: 0,
-                    orderId: 0,
-                    vehicleId: vehicle.id,
-                    vehicleInternalId: vehicle.internal_id,
-                    quantity: 1,
-                    purchasePriceHt: vehicle.vehicle_prices?.purchase_price_ht || 0,
-                    unitPriceHt: vehicle.vehicle_prices?.selling_price_ht || 0,
-                    sellingPriceHt: vehicle.vehicle_prices?.selling_price_ht || 0,
-                    tvaRate: 20,
-                    totalHt: 0,
-                    totalTva: 0,
-                    totalTtc: 0,
-                    isPaid: false,
-                    status: 'DRAFT',
-                    isDelivered: false,
-                    vehicle
-                }))
-            }
-        }
-    } catch (error) {
-        console.error('Erreur lors du chargement des données:', error)
+      }
     }
+  } catch (error) {
+    console.error('Erreur de chargement initial :', error)
+  }
 })
 </script>

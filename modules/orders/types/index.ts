@@ -18,47 +18,53 @@ export interface Vehicle {
   internal_id: string
   brand: string
   model: string
-  vin: string
+  version?: string
+  color?: string
+  vin: string | null
+  registration_number?: string
+  mileage?: number
+  year?: number
+  vehicle_prices?: {
+    purchase_price_ht: number
+    selling_price_ht: number
+    frevo: number
+  }
 }
 
 export interface OrderItem {
   id: number
-  vehicle?: Vehicle
+  orderId: number
+  vehicleId: string
+  vehicleInternalId: string
+  quantity: number
+  purchasePriceHt: number
+  unitPriceHt: number
   sellingPriceHt: number
+  tvaRate: number
+  totalHt: number
+  totalTva: number
+  totalTtc: number
+  isPaid: boolean
+  status: OrderStatus
+  isDelivered: boolean
+  metadata?: Record<string, any>
+  vehicle?: Vehicle | null
 }
 
-export interface Recipient {
+export interface VehicleCommission {
   id: number
-  name: string
-}
-
-export interface CommissionFormData {
-  applyToAll: boolean
-  order_item_id: number | null
-  commission_type_id: number | null
-  rate: number
-  amount: number
-  recipientType: 'owner' | 'contact' | 'company' | null
-  recipientId: number | null
-}
-
-export interface VehicleCommissionCreate {
   order_item_id: number
   commission_type_id: number
-  rate: number
+  owner_id?: number | null
+  contact_id?: number | null
+  company_id?: number | null
   amount: number
-  recipient_type: 'owner' | 'contact' | 'company'
+  rate: number
+  is_paid?: boolean
+  payment_date?: Date | null
+  metadata?: Record<string, any>
+  recipient_type: CommissionBeneficiaryType
   recipient_id: number
-}
-
-export interface VehicleCommission extends VehicleCommissionCreate {
-  id: number
-  recipient?: Recipient
-  order_item?: {
-    id: number
-    vehicle_id: number
-    vehicle: Vehicle
-  }
 }
 
 export type CommissionBeneficiaryType = 'owner' | 'contact' | 'company'

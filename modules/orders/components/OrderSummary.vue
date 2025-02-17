@@ -17,19 +17,21 @@
         <span class="font-medium">Total TTC</span>
         <span class="text-lg font-bold">{{ formatCurrency(totalTTC) }}</span>
       </div>
-      <div class="flex justify-between items-center text-sm">
-        <span class="text-muted-foreground">Marge brute</span>
-        <span class="font-medium">{{ formatCurrency(totalMargin) }}</span>
-      </div>
-      <template v-if="showCommissions">
+      <template v-if="displayMargin">
         <div class="flex justify-between items-center text-sm">
-          <span class="text-muted-foreground">Total commissions</span>
-          <span class="font-medium">{{ formatCurrency(totalCommissions) }}</span>
+          <span class="text-muted-foreground">Marge brute</span>
+          <span class="font-medium">{{ formatCurrency(totalMargin) }}</span>
         </div>
-        <div class="flex justify-between items-center text-sm">
-          <span class="text-muted-foreground">Marge nette</span>
-          <span class="font-medium">{{ formatCurrency(netMargin) }}</span>
-        </div>
+        <template v-if="showCommissions">
+          <div class="flex justify-between items-center text-sm">
+            <span class="text-muted-foreground">Total commissions</span>
+            <span class="font-medium">{{ formatCurrency(totalCommissions) }}</span>
+          </div>
+          <div class="flex justify-between items-center text-sm">
+            <span class="text-muted-foreground">Marge nette</span>
+            <span class="font-medium">{{ formatCurrency(netMargin) }}</span>
+          </div>
+        </template>
       </template>
     </CardContent>
   </Card>
@@ -50,7 +52,8 @@ import {
 
 const props = defineProps<{
   items: OrderItem[]
-  commissions?: VehicleCommission[]
+  commissions: VehicleCommission[]
+  displayMargin?: boolean
 }>()
 
 const {
@@ -68,4 +71,9 @@ const {
 const showCommissions = computed(() => 
   props.commissions && props.commissions.length > 0
 )
-</script> 
+</script>
+
+<OrderTotals
+  :items="items"
+  :display-margin="displayMargin"
+/> 

@@ -82,7 +82,7 @@ const selectedType = ref<SaleType | ''>('')
 const saleTypes = [
   { value: 'B2C', label: 'Particulier' },
   { value: 'B2B', label: 'Professionnel' },
-  { value: 'B2B2B', label: 'Inter-professionnel' }
+  { value: 'B2B2B', label: 'Intermédiation' }
 ]
 
 const createOrder = () => {

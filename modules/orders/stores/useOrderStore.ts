@@ -2,6 +2,14 @@ import { defineStore } from 'pinia'
 import type { Order, OrderItem, VehicleCommission, SaleType, OrderStatus } from '../types'
 import type { PostgrestError } from '@supabase/supabase-js'
 
+interface CreateOrderResponse {
+  success: boolean
+  orderId?: number
+  orderNumber?: string
+  message?: string
+  error?: string
+}
+
 export const useOrderStore = defineStore('orders', {
   state: () => ({
     orders: [] as Order[],
@@ -153,6 +161,37 @@ export const useOrderStore = defineStore('orders', {
         return data as VehicleCommission
       } catch (error) {
         this.error = (error as PostgrestError).message
+        return null
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async createOrderWithFunction(orderData: Record<string, any>): Promise<CreateOrderResponse | null> {
+      this.loading = true
+      try {
+        console.log('Appel de la fonction stockée create_order avec les données:', orderData)
+        const { data, error } = await useSupabaseClient()
+          .rpc('create_order', { p_data: orderData })
+
+        console.log('Réponse de Supabase:', { data, error })
+
+        if (error) {
+          console.error('Erreur Supabase:', error)
+          throw error
+        }
+
+        if (data.success) {
+          console.log('Création réussie, rafraîchissement de la liste')
+          await this.fetchOrders()
+          return data as CreateOrderResponse
+        } else {
+          console.error('Échec de la création côté base de données:', data.error)
+          throw new Error(data.error || 'Erreur inconnue')
+        }
+      } catch (error) {
+        console.error('Erreur dans createOrderWithFunction:', error)
+        this.error = (error as Error).message
         return null
       } finally {
         this.loading = false

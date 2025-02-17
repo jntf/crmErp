@@ -2,7 +2,7 @@
   <Card class="w-full">
     <CardHeader>
       <div class="flex items-center justify-between">
-        <CardTitle>Commissions</CardTitle>
+        <CardTitle class="text-base font-semibold">Commissions</CardTitle>
         <Button variant="outline" size="sm" @click="openAddCommissionDialog">
           <PlusIcon class="w-4 h-4 mr-2" />
           Ajouter
@@ -26,9 +26,8 @@
             </Button>
           </div>
           <div class="pl-4 space-y-1">
-            <div v-for="commission in group.commissions" :key="commission.id" class="text-sm text-gray-600">
-              {{ getVehicleReference(commission.order_item_id) }} - {{ formatCurrency(commission.amount) }}
-              <span class="text-xs text-muted-foreground">(ID: {{ commission.order_item_id }})</span>
+            <div v-for="(commission, index) in group.commissions" :key="commission.id" class="text-sm text-gray-600">
+              {{ getVehicleReference(commission.order_item_id, index) }} - {{ formatCurrency(commission.amount) }}
             </div>
           </div>
           <Separator />
@@ -58,7 +57,6 @@ import { formatCurrency } from '~/utils/formatter'
 import { useCommissionStore } from '@/stores/useCommissionStore'
 import { toast } from 'vue-sonner'
 import AddCommissionDialog from './AddCommissionDialog.vue'
-import type { OrderItem, VehicleCommission, Recipient } from '../types'
 import {
   Card,
   CardHeader,
@@ -68,6 +66,37 @@ import {
   Badge,
   Separator
 } from '#components'
+
+interface Vehicle {
+  id: number
+  internal_id: string
+  model: string
+  vin: string
+}
+
+interface OrderItem {
+  id: number
+  vehicle?: Vehicle
+}
+
+interface Recipient {
+  id: number
+  name: string
+}
+
+interface VehicleCommission {
+  id: number
+  recipient_type: 'owner' | 'contact' | 'company'
+  recipient_id: number
+  order_item_id: number | null
+  amount: number
+  recipient?: Recipient
+  order_item?: {
+    id: number
+    vehicle_id: number
+    vehicle: Vehicle
+  }
+}
 
 const props = defineProps<{
   modelValue: VehicleCommission[]
@@ -137,10 +166,16 @@ const getRecipientName = (commission: VehicleCommission) => {
 }
 
 // Helpers pour l'affichage
-const getVehicleReference = (orderItemId: number | null) => {
-  if (!orderItemId) return ''
+const getVehicleReference = (orderItemId: number | null, index: number) => {
+  if (orderItemId === null || orderItemId === undefined) return ''
+  
+  // Si order_item_id vaut 0, on utilise l'index pour retrouver le bon véhicule
+  if (orderItemId === 0 && props.orderItems.length > index) {
+    return props.orderItems[index].vehicle?.internal_id || 'Référence introuvable'
+  }
+  
   const item = props.orderItems.find(i => i.id === orderItemId)
-  return item?.vehicle?.internal_id || ''
+  return item?.vehicle?.internal_id || 'Référence introuvable'
 }
 
 // Actions
@@ -151,11 +186,6 @@ const openAddCommissionDialog = () => {
   }
   showAddCommissionDialog.value = true
 }
-
-// Ajout d'un watcher pour déboguer
-watch(showAddCommissionDialog, (newValue) => {
-  console.log('Dialog state changed:', newValue)
-})
 
 const handleAddCommission = (commission: VehicleCommission | VehicleCommission[]) => {
   const newCommissions = Array.isArray(commission) ? commission : [commission]
@@ -170,14 +200,4 @@ const removeCommissionGroup = (commissionsToRemove: VehicleCommission[]) => {
   const commissions = props.modelValue.filter(c => !orderItemIds.includes(c.order_item_id))
   emit('update:modelValue', commissions)
 }
-
-// Ajout d'un watcher pour déboguer les commissions
-watch(() => props.modelValue, (newValue) => {
-  console.log('Commissions mises à jour:', newValue)
-}, { deep: true })
-
-// Ajout d'un watcher pour déboguer les orderItems
-watch(() => props.orderItems, (newValue) => {
-  console.log('OrderItems disponibles:', newValue)
-}, { deep: true })
 </script> 

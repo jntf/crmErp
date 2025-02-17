@@ -227,7 +227,7 @@ const getSaleTypeLabel = (type: SaleType) => {
   const types = {
     B2C: 'Particulier',
     B2B: 'Professionnel',
-    B2B2B: 'Inter-professionnel'
+    B2B2B: 'Intermédiation'
   }
   return types[type]
 }

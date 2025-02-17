@@ -9,38 +9,6 @@
       </DialogHeader>
       
       <form @submit.prevent="handleSubmit" class="space-y-4">
-        <!-- Option: Appliquer à tous les véhicules -->
-        <div class="flex items-center gap-2">
-          <Checkbox v-model="form.applyToAll" id="applyAllCheckbox" />
-          <Label for="applyAllCheckbox">Appliquer à tous les véhicules</Label>
-        </div>
-
-        <!-- Sélection du véhicule (affichée seulement si applyToAll est false) -->
-        <div v-if="!form.applyToAll" class="space-y-2">
-          <Label>Véhicule</Label>
-          <Select 
-            :model-value="form.order_item_id ? form.order_item_id.toString() : ''"
-            @update:model-value="value => {
-              form.order_item_id = value ? parseInt(value) : null
-              calculateAmount()
-            }"
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Sélectionnez un véhicule" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem 
-                  v-for="item in orderItems" 
-                  :key="item.id" 
-                  :value="item.id.toString()"
-                >
-                  {{ item.vehicle?.brand }} {{ item.vehicle?.model }} - {{ formatCurrency(item.sellingPriceHt) }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
 
         <!-- Type de commission -->
         <div class="space-y-2">
@@ -88,7 +56,7 @@
             />
           </template>
           
-          <template v-else>
+          <template v-if="currentCommissionSettings?.calculationType === 'percentage'">
             <div class="flex justify-between items-center">
               <Label>Taux (%)</Label>
               <span class="text-sm text-muted-foreground">
@@ -191,7 +159,6 @@ import { formatCurrency } from '~/utils/formatter'
 import { useCommissionStore } from '@/stores/useCommissionStore'
 import { useOwnerStore } from '@/stores/useOwnerStore'
 import { toast } from 'vue-sonner'
-import type { OrderItem, CommissionFormData, VehicleCommissionCreate, Recipient } from '../types'
 import {
   Dialog,
   DialogContent,
@@ -213,34 +180,33 @@ import {
 
 const props = defineProps<{
   open: boolean
-  orderItems: OrderItem[]
-  contacts: Recipient[]
-  companies: Recipient[]
+  orderItems: any[]
+  contacts: any[]
+  companies: any[]
   ownerId?: number
 }>()
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  'add': [commission: VehicleCommissionCreate | VehicleCommissionCreate[]]
+  'add': [commission: any | any[]]
 }>()
 
 const commissionStore = useCommissionStore()
 const ownerStore = useOwnerStore()
 
 // État du formulaire
-const form = ref<CommissionFormData>({
+const form = ref({
   applyToAll: true,
-  order_item_id: null,
-  commission_type_id: null,
+  order_item_id: null as number | null,
+  commission_type_id: null as number | null,
   rate: 0,
   amount: 0,
-  recipientType: null,
-  recipientId: null
+  recipientType: null as 'owner' | 'contact' | 'company' | null,
+  recipientId: null as number | null
 })
 
 // Récupération des settings de l'owner
 const ownerSettings = computed(() => ownerStore.commissionSettings)
-console.log('ownerSettings', ownerSettings.value)
 
 // Types de commission actifs (maintenant basés sur les settings de l'owner)
 const commissionTypes = computed(() => {
@@ -386,38 +352,24 @@ const handleSubmit = () => {
   }
 
   if (form.value.applyToAll) {
-    // Vérifier que tous les items ont un ID valide
-    const invalidItems = props.orderItems.filter(item => !item.id || item.id === 0)
-    if (invalidItems.length > 0) {
-      toast.error('Certains véhicules n\'ont pas d\'identifiant valide')
-      return
-    }
-
-    const commissions: VehicleCommissionCreate[] = props.orderItems.map(item => ({
+    const commissions = props.orderItems.map(item => ({
       order_item_id: item.id,
-      commission_type_id: form.value.commission_type_id!,
+      commission_type_id: form.value.commission_type_id,
       rate: form.value.rate,
       amount: form.value.amount,
-      recipient_type: form.value.recipientType!,
-      recipient_id: form.value.recipientId!
+      recipient_type: form.value.recipientType,
+      recipient_id: form.value.recipientId
     }))
-    console.log('Commissions créées:', commissions)
     emit('add', commissions)
   } else {
-    if (!form.value.order_item_id || form.value.order_item_id === 0) {
-      toast.error('Veuillez sélectionner un véhicule valide')
-      return
-    }
-
-    const commission: VehicleCommissionCreate = {
+    const commission = {
       order_item_id: form.value.order_item_id,
-      commission_type_id: form.value.commission_type_id!,
+      commission_type_id: form.value.commission_type_id,
       rate: form.value.rate,
       amount: form.value.amount,
-      recipient_type: form.value.recipientType!,
-      recipient_id: form.value.recipientId!
+      recipient_type: form.value.recipientType,
+      recipient_id: form.value.recipientId
     }
-    console.log('Commission créée:', commission)
     emit('add', commission)
   }
 
@@ -448,7 +400,6 @@ const calculateCommissionAmount = (baseAmount: number) => {
 
 // Réinitialisation du formulaire
 const resetForm = () => {
-  console.log('Exécution de resetForm')
   form.value = {
     applyToAll: true,
     order_item_id: null,
@@ -458,21 +409,17 @@ const resetForm = () => {
     recipientType: null,
     recipientId: null
   }
-  console.log('Nouveau state du formulaire:', form.value)
 }
 
 // Watcher pour l'ouverture du dialog
 watch(() => props.open, (newValue) => {
-  console.log('Dialog open prop changed:', newValue)
   if (newValue) {
-    console.log('Réinitialisation du formulaire à l\'ouverture du dialog')
     resetForm()
   }
 }, { immediate: true })
 
 // Watcher pour applyToAll
 watch(() => form.value.applyToAll, (newValue) => {
-  console.log('applyToAll changed:', newValue)
   if (newValue) {
     form.value.order_item_id = null
     calculateAmount()
