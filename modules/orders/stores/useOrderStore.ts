@@ -22,19 +22,144 @@ export const useOrderStore = defineStore('orders', {
 
   actions: {
     async fetchOrders() {
+      console.log('Début fetchOrders')
       this.loading = true
+      this.error = null
+      
       try {
-        const { data, error } = await useSupabaseClient()
+        const supabase = useSupabaseClient()
+        console.log('Appel Supabase')
+        
+        const { data, error } = await supabase
           .from('orders')
-          .select('*')
+          .select(`
+            *,
+            contact:contacts(
+              id,
+              first_name,
+              last_name
+            ),
+            buyerCompany:companies!buyer_company_id(
+              id,
+              name,
+              vat_number
+            ),
+            sellerCompany:companies!seller_company_id(
+              id,
+              name,
+              vat_number
+            ),
+            items:order_items(
+              id,
+              order_id,
+              vehicle_id,
+              vehicle_internal_id,
+              quantity,
+              unit_price_ht,
+              tva_rate,
+              total_ht,
+              total_tva,
+              total_ttc,
+              is_paid,
+              is_delivered,
+              status,
+              metadata,
+              vehicle:vehicles!order_items_vehicle_id_fkey(
+                id,
+                internal_id,
+                brand,
+                model,
+                version,
+                color,
+                vin,
+                registration_number,
+                mileage,
+                year
+              )
+            )
+          `)
           .order('created_at', { ascending: false })
 
-        if (error) throw error
-        this.orders = data as Order[]
+        console.log('Réponse Supabase:', { data, error })
+
+        if (error) {
+          console.error('Erreur Supabase:', error)
+          throw error
+        }
+
+        // Transformation des données pour correspondre à nos types
+        this.orders = (data || []).map(order => {
+          const transformedOrder = {
+            id: order.id,
+            orderNumber: order.order_number,
+            orderDate: new Date(order.order_date),
+            saleType: order.sale_type,
+            status: order.status,
+            contactId: order.contact_id,
+            buyerCompanyId: order.buyer_company_id,
+            sellerCompanyId: order.seller_company_id,
+            totalHt: order.total_ht || 0,
+            totalTva: order.total_tva || 0,
+            totalTtc: order.total_ttc || 0,
+            comments: order.comments,
+            metadata: order.metadata,
+            createdAt: new Date(order.created_at),
+            updatedAt: new Date(order.updated_at),
+            contact: order.contact ? {
+              id: order.contact.id,
+              name: `${order.contact.first_name} ${order.contact.last_name}`.trim()
+            } : null,
+            buyerCompany: order.buyerCompany ? {
+              id: order.buyerCompany.id,
+              name: order.buyerCompany.name,
+              vatNumber: order.buyerCompany.vat_number
+            } : null,
+            sellerCompany: order.sellerCompany ? {
+              id: order.sellerCompany.id,
+              name: order.sellerCompany.name,
+              vatNumber: order.sellerCompany.vat_number
+            } : null,
+            items: (order.items || []).map(item => ({
+              id: item.id,
+              orderId: item.order_id,
+              vehicleId: item.vehicle_id,
+              vehicleInternalId: item.vehicle_internal_id,
+              quantity: item.quantity,
+              unitPriceHt: item.unit_price_ht,
+              tvaRate: item.tva_rate,
+              totalHt: item.total_ht,
+              totalTva: item.total_tva,
+              totalTtc: item.total_ttc,
+              isPaid: item.is_paid,
+              isDelivered: item.is_delivered,
+              status: item.status,
+              metadata: item.metadata,
+              vehicle: item.vehicle ? {
+                id: item.vehicle.id,
+                internalId: item.vehicle.internal_id,
+                brand: item.vehicle.brand,
+                model: item.vehicle.model,
+                version: item.vehicle.version,
+                color: item.vehicle.color,
+                vin: item.vehicle.vin,
+                registrationNumber: item.vehicle.registration_number,
+                mileage: item.vehicle.mileage,
+                year: item.vehicle.year
+              } : null
+            }))
+          }
+          
+          console.log('Order transformé:', transformedOrder)
+          return transformedOrder
+        }) as Order[]
+
+        console.log('Données transformées:', this.orders)
       } catch (error) {
+        console.error('Erreur dans fetchOrders:', error)
         this.error = (error as PostgrestError).message
       } finally {
         this.loading = false
+        console.log('Fin fetchOrders, loading:', this.loading)
       }
     },
 
@@ -204,7 +329,10 @@ export const useOrderStore = defineStore('orders', {
       return state.orders.find(order => order.id === id)
     },
     
-    getOrdersByType: (state) => (type: SaleType) => {
+    getOrdersByType: (state) => (type: SaleType | 'ALL') => {
+      console.log('getOrdersByType appelé avec:', type)
+      console.log('Orders disponibles:', state.orders)
+      if (type === 'ALL') return state.orders
       return state.orders.filter(order => order.saleType === type)
     },
 

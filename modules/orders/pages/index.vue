@@ -46,9 +46,14 @@ import { Card } from '@/components/ui/card'
 
 const activeTab = ref(0)
 
-const tabs = [
-  { label: 'Particuliers', value: 'B2C' as SaleType },
-  { label: 'Professionnels', value: 'B2B' as SaleType },
-  { label: 'Inter-professionnels', value: 'B2B2B' as SaleType },
+type TabValue = SaleType | 'ALL'
+
+const tabs: Array<{ label: string; value: TabValue }> = [
+  { label: 'Toutes les ventes', value: 'ALL' },
+  { label: 'Particuliers', value: 'B2C' },
+  { label: 'Professionnels', value: 'B2B' },
+  { label: 'Inter-professionnels', value: 'B2B2B' },
+  { label: 'B2P', value: 'B2P' },
+  { label: 'P2P', value: 'P2P' }
 ]
 </script> 

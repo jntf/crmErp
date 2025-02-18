@@ -21,7 +21,13 @@
       </DropdownMenu>
     </div>
 
-    <div class="rounded-md border">
+    <div v-if="loading" class="h-24 flex items-center justify-center">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+    </div>
+    <div v-else-if="error" class="h-24 flex items-center justify-center text-red-600">
+      {{ error }}
+    </div>
+    <div v-else class="rounded-md border">
       <Table>
         <TableHeader>
           <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
@@ -67,8 +73,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import type { SaleType, Order } from '../types'
+import { ref, computed, onMounted, onUnmounted, h } from 'vue'
+import type { SaleType, Order, OrderWithRelations, OrderStatus } from '../types'
 import type {
   ColumnDef,
   SortingState,
@@ -81,15 +87,13 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  useVueTable,
+  useVueTable
 } from '@tanstack/vue-table'
 import { useOrderStore } from '../stores/useOrderStore'
-import { formatCurrency } from '~/utils/formatter'
-import { formatDate } from '~/utils/formatter'
+import { formatCurrency, formatDate1 } from '~/utils/formatter'
 import { valueUpdater } from '~/utils'
 import OrderStatusBadge from './OrderStatusBadge.vue'
 import OrderRowActions from './actions/OrderRowActions.vue'
-import OrderActions from './actions/OrderActions.vue'
 import {
   Table,
   TableBody,
@@ -106,54 +110,96 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-// import { ChevronDownIcon, CaretSortIcon } from '@radix-icons/vue'
 import { ChevronDownIcon, ArrowUpDown } from 'lucide-vue-next'
 
-const props = defineProps<{
-  saleType: SaleType
-}>()
+type OrderListProps = {
+  saleType: SaleType | 'ALL'
+}
+
+const props = defineProps<OrderListProps>()
 
 const store = useOrderStore()
-const sorting = ref<SortingState>([])
-const columnFilters = ref<ColumnFiltersState>([])
-const columnVisibility = ref<VisibilityState>({})
-const rowSelection = ref({})
+
+const loading = computed(() => store.loading)
+const error = computed(() => store.error)
 
 const columns: ColumnDef<Order>[] = [
   {
     accessorKey: 'orderNumber',
-    header: ({ column }) => {
-      return h(Button, {
-        variant: 'ghost',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc'),
-      }, () => ['N° Commande', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })])
-    },
+    header: ({ column }) => h(Button, {
+      variant: 'ghost',
+      onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+    }, () => [ 'N° Commande', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' }) ]),
     cell: ({ row }) => {
-      return h(NuxtLink, {
-        to: '/orders/' + row.original.id,
-        class: 'text-blue-600 hover:text-blue-800'
-      }, () => row.getValue('orderNumber'))
+      const order = row.original as OrderWithRelations
+      return order.orderNumber
     }
   },
   {
     accessorKey: 'orderDate',
-    header: ({ column }) => {
-      return h(Button, {
-        variant: 'ghost',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc'),
-      }, () => ['Date', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })])
-    },
-    cell: ({ row }) => formatDate(row.getValue('orderDate'))
+    header: ({ column }) => h(Button, {
+      variant: 'ghost',
+      onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+    }, () => [ 'Date', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' }) ]),
+    cell: ({ row }) => {
+      const order = row.original as OrderWithRelations
+      return formatDate1(order.orderDate)
+    }
+  },
+  {
+    accessorKey: 'client',
+    header: 'Client',
+    cell: ({ row }) => {
+      const order = row.original as OrderWithRelations
+      if (order.saleType === 'B2C' && order.contact) {
+        return order.contact.name
+      } else if (order.buyerCompany) {
+        return order.buyerCompany.name
+      }
+      return '-'
+    }
+  },
+  {
+    accessorKey: 'articles',
+    header: 'Articles',
+    cell: ({ row }) => {
+      const order = row.original as OrderWithRelations
+      const items = order.items || []
+      const count = items.length
+      return count > 0 ? `${count} article${count > 1 ? 's' : ''}` : '-'
+    }
+  },
+  {
+    accessorKey: 'totalHt',
+    header: () => h('div', { class: 'text-right' }, 'Total HT'),
+    cell: ({ row }) => {
+      const order = row.original as OrderWithRelations
+      return h('div', { class: 'text-right font-medium' }, formatCurrency(order.totalHt || 0))
+    }
+  },
+  {
+    accessorKey: 'totalTva',
+    header: () => h('div', { class: 'text-right' }, 'TVA'),
+    cell: ({ row }) => {
+      const order = row.original as OrderWithRelations
+      return h('div', { class: 'text-right text-gray-600' }, formatCurrency(order.totalTva || 0))
+    }
   },
   {
     accessorKey: 'totalTtc',
-    header: () => h('div', { class: 'text-right' }, 'Total TTC'),
-    cell: ({ row }) => h('div', { class: 'text-right' }, formatCurrency(row.getValue('totalTtc')))
+    header: () => h('div', { class: 'text-right font-bold' }, 'Total TTC'),
+    cell: ({ row }) => {
+      const order = row.original as OrderWithRelations
+      return h('div', { class: 'text-right' }, formatCurrency(order.totalTtc || 0))
+    }
   },
   {
     accessorKey: 'status',
     header: 'Statut',
-    cell: ({ row }) => h(OrderStatusBadge, { status: row.getValue('status') })
+    cell: ({ row }) => {
+      const order = row.original as OrderWithRelations
+      return h(OrderStatusBadge, { status: order.status })
+    }
   },
   {
     id: 'actions',
@@ -162,12 +208,18 @@ const columns: ColumnDef<Order>[] = [
   }
 ]
 
-const filteredOrders = computed(() => {
-  return store.getOrdersByType(props.saleType)
-})
+const sorting = ref<SortingState>([])
+const columnFilters = ref<ColumnFiltersState>([])
+const columnVisibility = ref<VisibilityState>({})
+const rowSelection = ref({})
 
 const table = useVueTable({
-  data: filteredOrders.value,
+  data: computed(() => {
+    console.log('Computed data appelé')
+    const orders = store.getOrdersByType(props.saleType)
+    console.log('Orders filtrés:', orders)
+    return orders
+  }),
   columns,
   getCoreRowModel: getCoreRowModel(),
   getPaginationRowModel: getPaginationRowModel(),
@@ -185,7 +237,26 @@ const table = useVueTable({
   }
 })
 
+const loadOrders = async () => {
+  console.log('loadOrders appelé')
+  try {
+    await store.fetchOrders()
+    console.log('Orders chargés:', store.orders)
+  } catch (e) {
+    console.error('Erreur dans loadOrders:', e)
+  }
+}
+
+let refreshTimer: any
+
 onMounted(async () => {
-  await store.fetchOrders()
+  console.log('OrderList monté')
+  await loadOrders()
+  refreshTimer = setInterval(loadOrders, 30000)
+})
+
+onUnmounted(() => {
+  console.log('OrderList démonté')
+  if (refreshTimer) clearInterval(refreshTimer)
 })
 </script>

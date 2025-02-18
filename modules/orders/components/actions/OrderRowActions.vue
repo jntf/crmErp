@@ -2,19 +2,16 @@
   <DropdownMenu>
     <DropdownMenuTrigger as-child>
       <Button variant="ghost" class="h-8 w-8 p-0">
-        <Icon
-          name="heroicons:ellipsis-horizontal"
-          class="h-4 w-4"
-        />
+        <MoreHorizontal class="h-4 w-4" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end">
       <DropdownMenuItem @click="viewOrder">
-        <Icon name="heroicons:eye" class="mr-2 h-4 w-4" />
+        <Pencil class="mr-2 h-4 w-4" />
         Voir
       </DropdownMenuItem>
       <DropdownMenuItem @click="editOrder">
-        <Icon name="heroicons:pencil-square" class="mr-2 h-4 w-4" />
+        <Pencil class="mr-2 h-4 w-4" />
         Modifier
       </DropdownMenuItem>
       <DropdownMenuItem @click="downloadPdf">
@@ -47,12 +44,13 @@ import type { Order } from '../../types'
 import { useOrderStore } from '../../stores/useOrderStore'
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  Button
-} from '#components'
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from '@/components/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
+import { MoreHorizontal, Pencil, Trash } from 'lucide-vue-next'
 
 const props = defineProps<{
   order: Order
