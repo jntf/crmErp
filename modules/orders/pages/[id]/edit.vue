@@ -348,7 +348,10 @@ const saveOrder = async () => {
       orderDate: new Date().toISOString()
     }
 
-    console.log('Données préparées pour la sauvegarde:', orderData)
+    console.log('Type de vente:', form.value.saleType)
+    console.log('ID Entreprise acheteuse:', form.value.buyerCompanyId)
+    console.log('ID Entreprise vendeuse:', form.value.sellerCompanyId)
+    console.log('Données complètes de la commande:', orderData)
 
     const result = await store.createOrderWithFunction(orderData)
     console.log('Résultat de la création:', result)

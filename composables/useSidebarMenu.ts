@@ -10,7 +10,8 @@ import {
     GlobeIcon,
     ShieldIcon,
     PercentIcon,
-    LayoutGridIcon
+    LayoutGridIcon,
+    CoinsIcon
 } from 'lucide-vue-next'
 import { useModuleStore } from '@/stores/useModuleStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -77,6 +78,14 @@ export const useSidebarMenu = () => {
                     module: 'orders',
                     description: 'Gestion des commandes',
                     roles: ['user']
+                },
+                {
+                    label: 'Commissions',
+                    icon: CoinsIcon,
+                    path: '/orders/commissions',
+                    module: 'orders',
+                    description: 'Gestion des commissions',
+                    roles: ['admin', 'manager']
                 }
             ]
         },

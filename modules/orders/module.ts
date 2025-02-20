@@ -18,6 +18,11 @@ export default defineNuxtModule({
           file: resolve('./pages/index.vue')
         },
         {
+          name: 'orders-commissions',
+          path: '/orders/commissions',
+          file: resolve('./pages/commissions/index.vue')
+        },
+        {
           name: 'orders-new',
           path: '/orders/new',
           file: resolve('./pages/[id]/edit.vue')

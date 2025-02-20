@@ -55,16 +55,21 @@ export interface VehicleCommission {
   id: number
   order_item_id: number
   commission_type_id: number
-  owner_id?: number | null
-  contact_id?: number | null
-  company_id?: number | null
   amount: number
-  rate: number
-  is_paid?: boolean
-  payment_date?: Date | null
-  metadata?: Record<string, any>
-  recipient_type: CommissionBeneficiaryType
-  recipient_id: number
+  rate: number | null
+  metadata: Record<string, any>
+  created_at: string
+  updated_at: string
+  order_item?: {
+    id: number
+    vehicle?: {
+      id: number
+      internal_id: string
+      model: string
+      vin: string
+    }
+  }
+  invoice?: CommissionInvoice[]
 }
 
 export type CommissionBeneficiaryType = 'owner' | 'contact' | 'company'
@@ -133,4 +138,27 @@ export interface OrderFormData {
   totalTva: number
   totalTtc: number
   status?: OrderStatus
-} 
+}
+
+export interface Owner {
+  id: number
+  name: string
+}
+
+export interface CommissionInvoice {
+  id: number
+  vehicle_commission_id: number
+  issuer_id: number
+  recipient_id: number
+  recipient_type: 'contact' | 'company' | 'owner'
+  external_invoice_id: string | null
+  status: 'pending' | 'paid' | 'cancelled'
+  created_at: string
+  updated_at: string
+  issuer?: {
+    id: number
+    name: string
+  }
+}
+
+export type InvoiceStatus = 'all' | 'pending' | 'paid' | 'cancelled' 
