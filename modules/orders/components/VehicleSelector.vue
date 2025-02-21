@@ -158,13 +158,11 @@ const filteredVehicles = computed(() => {
 const isAllSelected = computed(() => {
   const result = filteredVehicles.value.length > 0 && 
     filteredVehicles.value.every(vehicle => isSelected(vehicle))
-  console.log('isAllSelected:', result, 'selectedVehicles:', selectedVehicles.value.length)
   return result
 })
 
 const isIndeterminate = computed(() => {
   const result = selectedVehicles.value.length > 0 && !isAllSelected.value
-  console.log('isIndeterminate:', result)
   return result
 })
 
@@ -174,28 +172,20 @@ const isSelected = (vehicle: Vehicle) => {
 }
 
 const toggleVehicle = (vehicle: Vehicle) => {
-  console.log('toggleVehicle:', vehicle.internal_id)
   const index = selectedVehicles.value.findIndex(v => v.id === vehicle.id)
   if (index === -1) {
-    console.log('Adding vehicle to selection')
     selectedVehicles.value = [...selectedVehicles.value, vehicle]
   } else {
-    console.log('Removing vehicle from selection')
     selectedVehicles.value = selectedVehicles.value.filter(v => v.id !== vehicle.id)
   }
-  console.log('selectedVehicles after toggle:', selectedVehicles.value.length)
 }
 
 const toggleAll = () => {
-  console.log('toggleAll, isAllSelected:', isAllSelected.value)
   if (isAllSelected.value) {
-    console.log('Clearing selection')
     selectedVehicles.value = []
   } else {
-    console.log('Selecting all filtered vehicles')
     selectedVehicles.value = [...filteredVehicles.value]
   }
-  console.log('selectedVehicles after toggleAll:', selectedVehicles.value.length)
 }
 
 const confirm = () => {

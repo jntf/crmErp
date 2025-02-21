@@ -1,32 +1,44 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from '#imports'
 
+interface CommissionResult {
+  commission_id: number
+  commission_amount: number
+  commission_rate: number | null
+  commission_created_at: string
+  invoice_id: number
+  invoice_status: string
+  invoice_external_id: string | null
+  recipient_id: number
+  recipient_type: string
+  recipient_name: string | null
+  vehicle_id: string
+  vehicle_internal_id: string
+  vehicle_vin: string | null
+  vehicle_registration_number: string | null
+  vehicle_brand: string
+  vehicle_model: string
+  order_number: string
+}
+
 interface Commission {
-  id: number
-  order_item_id: number
-  commission_type_id: number
-  amount: number
-  rate: number | null
-  metadata: {
-    recipientId: number
-    recipientType: 'company' | 'contact' | 'owner'
-  }
-  order_item?: {
-    id: number
-    order: {
-      id: number
-      order_number: string
-    }
-  }
-  invoice?: {
-    id: number
-    status: 'pending' | 'paid' | 'cancelled'
-    external_invoice_id: string | null
-    recipient?: {
-      id: number
-      name: string
-    }
-  }[]
+  commission_id: number
+  commission_amount: number
+  commission_rate: number | null
+  commission_created_at: string
+  invoice_id: number
+  invoice_status: 'pending' | 'paid' | 'cancelled'
+  invoice_external_id: string | null
+  recipient_id: number
+  recipient_type: 'company' | 'contact' | 'owner'
+  recipient_name: string | null
+  vehicle_id: string
+  vehicle_internal_id: string
+  vehicle_vin: string | null
+  vehicle_registration_number: string | null
+  vehicle_brand: string
+  vehicle_model: string
+  order_number: string
 }
 
 export const useCommissionStore = defineStore('commission', () => {
@@ -34,23 +46,23 @@ export const useCommissionStore = defineStore('commission', () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
+  // Getter filtré par statut
+  const getCommissionsByStatus = (status: string) => {
+    if (status === 'all') return commissions.value
+    return commissions.value.filter(c => c.invoice_status === status)
+  }
+
   // Getters pour les compteurs
   const totalCommissions = computed(() => commissions.value.length)
   const pendingCommissions = computed(() => 
-    commissions.value.filter(c => c.invoice?.[0]?.status === 'pending').length
+    commissions.value.filter(c => c.invoice_status === 'pending').length
   )
   const paidCommissions = computed(() => 
-    commissions.value.filter(c => c.invoice?.[0]?.status === 'paid').length
+    commissions.value.filter(c => c.invoice_status === 'paid').length
   )
   const cancelledCommissions = computed(() => 
-    commissions.value.filter(c => c.invoice?.[0]?.status === 'cancelled').length
+    commissions.value.filter(c => c.invoice_status === 'cancelled').length
   )
-
-  // Getter filtré par statut
-  const getCommissionsByStatus = computed(() => (status: string) => {
-    if (status === 'all') return commissions.value
-    return commissions.value.filter(c => c.invoice?.[0]?.status === status)
-  })
 
   // Actions
   const fetchCommissions = async () => {
@@ -59,35 +71,37 @@ export const useCommissionStore = defineStore('commission', () => {
     try {
       const supabase = useSupabaseClient()
       const { data, error: err } = await supabase
-        .from('vehicle_commissions')
-        .select(`
-          *,
-          order_item:order_items (
-            id,
-            order:orders (
-              id,
-              order_number
-            )
-          ),
-          invoice:commission_invoices (
-            id,
-            status,
-            external_invoice_id,
-            recipient:companies (
-              id,
-              name
-            )
-          )
-        `)
-        .order('created_at', { ascending: false })
+        .rpc('get_commissions')
 
       if (err) {
         console.error('Erreur détaillée:', err)
         throw err
       }
+
       
-      console.log('commissions récupérées:', data)
-      commissions.value = data || []
+
+      // Transformer les données pour correspondre à l'interface Commission
+      const transformedData: Commission[] = (data as CommissionResult[]).map(item => ({
+        commission_id: item.commission_id,
+        commission_amount: item.commission_amount,
+        commission_rate: item.commission_rate,
+        commission_created_at: item.commission_created_at,
+        invoice_id: item.invoice_id,
+        invoice_status: item.invoice_status as 'pending' | 'paid' | 'cancelled',
+        invoice_external_id: item.invoice_external_id,
+        recipient_id: item.recipient_id,
+        recipient_type: item.recipient_type as 'company' | 'contact' | 'owner',
+        recipient_name: item.recipient_name,
+        vehicle_id: item.vehicle_id,
+        vehicle_internal_id: item.vehicle_internal_id,
+        vehicle_vin: item.vehicle_vin,
+        vehicle_registration_number: item.vehicle_registration_number,
+        vehicle_brand: item.vehicle_brand,
+        vehicle_model: item.vehicle_model,
+        order_number: item.order_number
+      }))
+      
+      commissions.value = transformedData
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Une erreur est survenue'
       console.error('Erreur lors du chargement des commissions:', err)

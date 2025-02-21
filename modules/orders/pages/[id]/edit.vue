@@ -314,10 +314,28 @@ const fetchOrder = async () => {
   }
 }
 
+// Ajout des interfaces pour les logs
+interface TvaLog {
+  message: string
+}
+
+interface CreateOrderResponse {
+  success: boolean
+  orderId: number
+  orderNumber: string
+  message: string
+  logs?: TvaLog[]
+  error?: string
+}
+
 const saveOrder = async () => {
   saving.value = true
   try {
-    console.log('Début de la sauvegarde de la commande')
+    console.log('----------- DÉBUT CRÉATION COMMANDE -----------')
+    console.log('TYPE DE VENTE:', form.value.saleType)
+    console.log('ENTREPRISE ACHETEUSE:', form.value.buyerCompanyId)
+    console.log('ENTREPRISE VENDEUSE:', form.value.sellerCompanyId)
+
     const orderData = {
       saleType: form.value.saleType,
       contactId: form.value.contactId,
@@ -348,24 +366,34 @@ const saveOrder = async () => {
       orderDate: new Date().toISOString()
     }
 
-    console.log('Type de vente:', form.value.saleType)
-    console.log('ID Entreprise acheteuse:', form.value.buyerCompanyId)
-    console.log('ID Entreprise vendeuse:', form.value.sellerCompanyId)
-    console.log('Données complètes de la commande:', orderData)
+    console.log('DONNÉES ENVOYÉES:', JSON.stringify(orderData, null, 2))
 
-    const result = await store.createOrderWithFunction(orderData)
-    console.log('Résultat de la création:', result)
+    const result = await store.createOrderWithFunction(orderData) as CreateOrderResponse
     
+    console.log('----------- RÉSULTAT -----------')
     if (result?.success) {
-      console.log('Création réussie, redirection vers la liste')
+      console.log('✅ CRÉATION RÉUSSIE')
+      console.log('ID:', result.orderId)
+      console.log('NUMÉRO:', result.orderNumber)
+      
+      if (result.logs?.length) {
+        console.log('----------- LOGS TVA -----------')
+        result.logs.forEach((log) => {
+          console.log('🔍', log.message)
+        })
+      } else {
+        console.log('❌ Pas de logs TVA disponibles')
+      }
+
       router.push('/orders')
     } else {
-      console.error('Échec de la création:', result?.error)
+      console.error('❌ ÉCHEC DE LA CRÉATION')
+      console.error('Erreur:', result?.error)
       throw new Error(result?.error || 'Erreur lors de la création de la commande')
     }
+    console.log('----------- FIN CRÉATION COMMANDE -----------')
   } catch (error) {
-    console.error('Erreur détaillée lors de la création de la commande:', error)
-    throw error
+    console.error('❌ ERREUR CRITIQUE:', error)
   } finally {
     saving.value = false
   }
