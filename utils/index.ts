@@ -9,4 +9,8 @@ export const valueUpdater = <T>(
     typeof updaterOrValue === 'function'
       ? (updaterOrValue as Updater<T>)(ref.value)
       : updaterOrValue
-} 
+}
+
+export const cn = (...classes: string[]) => {
+  return classes.filter(Boolean).join(' ')
+}

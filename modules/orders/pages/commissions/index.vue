@@ -55,7 +55,7 @@ import { ref, computed } from '#imports'
 import { Tab, TabGroup, TabList, TabPanel, TabPanels } from '@headlessui/vue'
 import { ArrowLeft } from 'lucide-vue-next'
 import CommissionsTable from '../../components/CommissionsTable.vue'
-import { useCommissionStore } from '../../stores/useCommissionStore'
+import { useCommissionStore } from '../../stores/useCommissionStoreModule'
 import {
     Card,
     CardContent,

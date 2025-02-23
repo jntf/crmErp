@@ -31,7 +31,8 @@
     "lucide-vue-next": "^0.469.0",
     "nuxt": "^3.14.1592",
     "pinia": "^2.3.0",
-    "radix-vue": "^1.9.11",
+    "radix-vue": "^1.9.16",
+    "reka-ui": "^2.0.0",
     "shadcn-nuxt": "^0.11.3",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
@@ -46,6 +47,7 @@
   "devDependencies": {
     "@nuxtjs/color-mode": "^3.5.2",
     "@types/xml2js": "^0.4.14",
-    "@unocss/nuxt": "^65.4.3"
+    "@unocss/nuxt": "^65.4.3",
+    "typescript": "^5.7.3"
   }
 }

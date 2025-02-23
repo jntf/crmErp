@@ -108,10 +108,36 @@
               <template v-else-if="form.saleType === 'B2B'">
                 <div class="space-y-2">
                   <Label>Entreprise acheteuse</Label>
-                  <SearchableSelect v-model="buyerCompanyIdStr" :options="companies.map(company => ({
-                    value: company.id.toString(),
-                    label: company.name
-                  }))" placeholder="Sélectionnez une entreprise" />
+                  <Combobox by="label" v-model="buyerCompanyIdStr">
+                    <ComboboxAnchor>
+                      <div class="relative w-full items-center">
+                        <ComboboxInput 
+                          :display-value="(val) => companies.find(c => c.id.toString() === val)?.name ?? ''" 
+                          placeholder="Sélectionnez une entreprise..." 
+                        />
+                        <ComboboxTrigger class="absolute end-0 inset-y-0 flex items-center justify-center px-3">
+                          <ChevronsUpDown class="size-4 text-muted-foreground" />
+                        </ComboboxTrigger>
+                      </div>
+                    </ComboboxAnchor>
+                    <ComboboxList>
+                      <ComboboxEmpty>
+                        Aucune entreprise trouvée.
+                      </ComboboxEmpty>
+                      <ComboboxGroup>
+                        <ComboboxItem
+                          v-for="company in companies"
+                          :key="company.id"
+                          :value="company.id.toString()"
+                        >
+                          {{ company.name }}
+                          <ComboboxItemIndicator>
+                            <Check :class="cn('ml-auto h-4 w-4')" />
+                          </ComboboxItemIndicator>
+                        </ComboboxItem>
+                      </ComboboxGroup>
+                    </ComboboxList>
+                  </Combobox>
                 </div>
               </template>
 
@@ -119,17 +145,69 @@
                 <div class="space-y-4">
                   <div class="space-y-2">
                     <Label>Entreprise acheteuse</Label>
-                    <SearchableSelect v-model="buyerCompanyIdStr" :options="companies.map(company => ({
-                      value: company.id.toString(),
-                      label: company.name
-                    }))" placeholder="Sélectionnez une entreprise" />
+                    <Combobox by="label" v-model="buyerCompanyIdStr">
+                      <ComboboxAnchor>
+                        <div class="relative w-full items-center">
+                          <ComboboxInput 
+                            :display-value="(val) => companies.find(c => c.id.toString() === val)?.name ?? ''" 
+                            placeholder="Sélectionnez une entreprise..." 
+                          />
+                          <ComboboxTrigger class="absolute end-0 inset-y-0 flex items-center justify-center px-3">
+                            <ChevronsUpDown class="size-4 text-muted-foreground" />
+                          </ComboboxTrigger>
+                        </div>
+                      </ComboboxAnchor>
+                      <ComboboxList>
+                        <ComboboxEmpty>
+                          Aucune entreprise trouvée.
+                        </ComboboxEmpty>
+                        <ComboboxGroup>
+                          <ComboboxItem
+                            v-for="company in companies"
+                            :key="company.id"
+                            :value="company.id.toString()"
+                          >
+                            {{ company.name }}
+                            <ComboboxItemIndicator>
+                              <Check :class="cn('ml-auto h-4 w-4')" />
+                            </ComboboxItemIndicator>
+                          </ComboboxItem>
+                        </ComboboxGroup>
+                      </ComboboxList>
+                    </Combobox>
                   </div>
                   <div class="space-y-2">
                     <Label>Entreprise vendeuse</Label>
-                    <SearchableSelect v-model="sellerCompanyIdStr" :options="companies.map(company => ({
-                      value: company.id.toString(),
-                      label: company.name
-                    }))" placeholder="Sélectionnez une entreprise" />
+                    <Combobox by="label" v-model="sellerCompanyIdStr">
+                      <ComboboxAnchor>
+                        <div class="relative w-full items-center">
+                          <ComboboxInput 
+                            :display-value="(val) => companies.find(c => c.id.toString() === val)?.name ?? ''" 
+                            placeholder="Sélectionnez une entreprise..." 
+                          />
+                          <ComboboxTrigger class="absolute end-0 inset-y-0 flex items-center justify-center px-3">
+                            <ChevronsUpDown class="size-4 text-muted-foreground" />
+                          </ComboboxTrigger>
+                        </div>
+                      </ComboboxAnchor>
+                      <ComboboxList>
+                        <ComboboxEmpty>
+                          Aucune entreprise trouvée.
+                        </ComboboxEmpty>
+                        <ComboboxGroup>
+                          <ComboboxItem
+                            v-for="company in companies"
+                            :key="company.id"
+                            :value="company.id.toString()"
+                          >
+                            {{ company.name }}
+                            <ComboboxItemIndicator>
+                              <Check :class="cn('ml-auto h-4 w-4')" />
+                            </ComboboxItemIndicator>
+                          </ComboboxItem>
+                        </ComboboxGroup>
+                      </ComboboxList>
+                    </Combobox>
                   </div>
                 </div>
               </template>
@@ -161,9 +239,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeftIcon, DownloadIcon } from 'lucide-vue-next'
+import { ArrowLeftIcon, DownloadIcon, Check, ChevronsUpDown } from 'lucide-vue-next'
 import { useOrderStore } from '../../stores/useOrderStore'
 import { formatDate1 } from '~/utils/formatter'
+import { cn } from '@/utils'
 import type { 
   Order, 
   OrderItem, 
@@ -175,7 +254,6 @@ import type {
   Vehicle 
 } from '../../types'
 import { useReferenceData } from '../../composables/useReferenceData'
-import SearchableSelect from '../../components/ui/SearchableSelect.vue'
 import OrderItems from '../../components/OrderItems.vue'
 import OrderSummary from '../../components/OrderSummary.vue'
 import CommissionList from '../../components/CommissionList.vue'
@@ -195,7 +273,16 @@ import {
   SelectGroup,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
+  Combobox,
+  ComboboxAnchor,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxItemIndicator,
+  ComboboxList,
+  ComboboxTrigger
 } from '#components'
 
 const route = useRoute()

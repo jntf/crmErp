@@ -134,7 +134,7 @@ import {
 } from '@tanstack/vue-table'
 import { ChevronDown, MoreHorizontal, ArrowUpDown } from 'lucide-vue-next'
 import { formatCurrency } from '@/utils/formatter'
-import { useCommissionStore } from '../stores/useCommissionStore'
+import { useCommissionStore } from '../stores/useCommissionStoreModule'
 import {
   Loader2Icon,
   CheckIcon,
