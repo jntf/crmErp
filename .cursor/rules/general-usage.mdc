@@ -1,0 +1,11 @@
+---
+description: Règle générale pour le projet crmErp, définissant les principes de base concernant la structure du code, l’utilisation de la Composition API et la gestion des erreurs.
+globs: **/*.vue **/*.ts **/composables/** **/middleware/** **/server/** **/plugins/**
+---
+
+# Principes Généraux
+- Utiliser la Composition API avec <script setup> pour tous les composants Vue.
+- Respecter le principe DRY (ne pas dupliquer le code inutilement).
+- Rédiger les commentaires en français et maintenir un style de code cohérent.
+- Mettre en place une gestion proactive des erreurs et suivre les bonnes pratiques de sécurité.
+- Se conformer aux conventions de nommage (PascalCase pour les composants, use<Nom> pour les composables).

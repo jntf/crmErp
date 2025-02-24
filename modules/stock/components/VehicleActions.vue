@@ -35,7 +35,8 @@ import {
     Building2,
     ShoppingCart,
     Upload,
-    Settings2
+    Settings2,
+    Package
 } from 'lucide-vue-next'
 import {
     Tooltip,
@@ -58,6 +59,7 @@ const emit = defineEmits<{
     (e: 'createOrder'): void
     (e: 'importExcel'): void
     (e: 'manage-equipment'): void
+    (e: 'manage-stock'): void
 }>()
 
 const actions = computed(() => [
@@ -116,6 +118,13 @@ const actions = computed(() => [
         tooltip: 'Gérer les équipements',
         requiresSelection: true,
         handler: () => emit('manage-equipment')
+    },
+    {
+        id: 'stock',
+        icon: Package,
+        tooltip: 'Gérer le stock',
+        requiresSelection: true,
+        handler: () => emit('manage-stock')
     }
 ])
 </script> 

@@ -2,7 +2,7 @@
   <Dialog :open="modelValue" @update:open="$emit('update:modelValue', $event)">
     <DialogContent class="sm:max-w-[425px]">
       <DialogHeader>
-        <DialogTitle>Mise à jour du statut</DialogTitle>
+        <DialogTitle>Mise à jour du statut de stock</DialogTitle>
         <DialogDescription>
           Sélectionnez le nouveau statut pour {{ selectedCount }} véhicule(s)
         </DialogDescription>
@@ -21,6 +21,28 @@
             </Label>
           </div>
         </RadioGroup>
+
+        <!-- Champs additionnels selon le statut -->
+        <div v-if="showAdditionalFields" class="space-y-4">
+          <!-- Localisation -->
+          <div class="space-y-2">
+            <Label>Localisation</Label>
+            <Input
+              v-model="form.location"
+              placeholder="Ex: Parking A"
+            />
+          </div>
+
+          <!-- Notes -->
+          <div class="space-y-2">
+            <Label>Notes</Label>
+            <Textarea
+              v-model="form.notes"
+              placeholder="Notes additionnelles..."
+              rows="3"
+            />
+          </div>
+        </div>
       </div>
       <DialogFooter>
         <Button variant="outline" @click="$emit('update:modelValue', false)">Annuler</Button>
@@ -39,78 +61,75 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Loader2 } from 'lucide-vue-next'
 import { useToast } from '@/components/ui/toast/use-toast'
-import { VehicleStatusEnum } from '../types'
+import type { Vehicle } from '../types'
+import { VehicleStockStatus } from '../types/stock'
+import { useVehicleStockStore } from '../stores/useVehicleStockStore'
 
 const props = defineProps<{
   modelValue: boolean
-  selectedVehicles: any[]
+  selectedVehicles: Vehicle[]
 }>()
 
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean]
-  'status-updated': [vehicles: any[]]
+  (e: 'update:modelValue', value: boolean): void
+  (e: 'status-updated'): void
 }>()
 
 const { toast } = useToast()
+const stockStore = useVehicleStockStore()
 const updating = ref(false)
-const selectedStatus = ref<VehicleStatusEnum>(VehicleStatusEnum.IN_STOCK)
+const selectedStatus = ref<VehicleStockStatus>(VehicleStockStatus.ORDERED)
+
+const form = ref({
+  location: '',
+  notes: ''
+})
 
 const selectedCount = computed(() => props.selectedVehicles.length)
 
+const showAdditionalFields = computed(() => [
+  VehicleStockStatus.RECEIVED,
+  VehicleStockStatus.PREPARED,
+  VehicleStockStatus.AVAILABLE
+].includes(selectedStatus.value))
+
 const statuses = [
-  { value: VehicleStatusEnum.IN_STOCK, label: 'En stock', classes: 'bg-green-100 text-green-700' },
-  { value: VehicleStatusEnum.IN_OFFER, label: 'En offre', classes: 'bg-orange-100 text-orange-700' },
-  { value: VehicleStatusEnum.IN_TRADING, label: 'Trading', classes: 'bg-yellow-100 text-yellow-700' },
-  { value: VehicleStatusEnum.IN_DEALING, label: 'A risque', classes: 'bg-yellow-100 text-yellow-700' },
-  { value: VehicleStatusEnum.RESERVED, label: 'Réservé', classes: 'bg-yellow-100 text-yellow-700' },
-  { value: VehicleStatusEnum.SOLD, label: 'Vendu', classes: 'bg-blue-100 text-blue-700' },
-  { value: VehicleStatusEnum.EXPOSED, label: 'Exposé', classes: 'bg-purple-100 text-purple-700' },
-  { value: VehicleStatusEnum.IN_TRANSIT, label: 'En transit', classes: 'bg-indigo-100 text-indigo-700' },
-  { value: VehicleStatusEnum.DELIVERED, label: 'Livré', classes: 'bg-green-100 text-green-700' },
-  { value: VehicleStatusEnum.BILLED, label: 'Facturé', classes: 'bg-blue-100 text-blue-700' },
-  { value: VehicleStatusEnum.ARCHIVED, label: 'Archivé', classes: 'bg-gray-100 text-gray-700' }
+  { value: VehicleStockStatus.ORDERED, label: 'Commandé', classes: 'bg-blue-100 text-blue-700' },
+  { value: VehicleStockStatus.IN_TRANSIT, label: 'En transit', classes: 'bg-indigo-100 text-indigo-700' },
+  { value: VehicleStockStatus.RECEIVED, label: 'Reçu', classes: 'bg-green-100 text-green-700' },
+  { value: VehicleStockStatus.PREPARED, label: 'Préparé', classes: 'bg-yellow-100 text-yellow-700' },
+  { value: VehicleStockStatus.AVAILABLE, label: 'Disponible', classes: 'bg-green-100 text-green-700' },
+  { value: VehicleStockStatus.RESERVED, label: 'Réservé', classes: 'bg-orange-100 text-orange-700' },
+  { value: VehicleStockStatus.SOLD, label: 'Vendu', classes: 'bg-blue-100 text-blue-700' },
+  { value: VehicleStockStatus.CANCELLED, label: 'Annulé', classes: 'bg-gray-100 text-gray-700' }
 ]
 
 const handleSubmit = async () => {
   updating.value = true
-  const supabase = useSupabaseClient()
-
   try {
-    // Récupérer d'abord les status existants pour avoir les IDs
-    const { data: existingStatuses, error: fetchError } = await supabase
-      .from('vehicle_status')
-      .select('id, vehicle_id')
-      .in('vehicle_id', props.selectedVehicles.map(v => v.id))
-
-    if (fetchError) throw fetchError
-
-    // Créer les updates avec les IDs existants
-    const updates = props.selectedVehicles.map(vehicle => {
-      const existingStatus = existingStatuses?.find(status => status.vehicle_id === vehicle.id)
-      return {
-        id: existingStatus?.id, // Utiliser l'ID existant s'il existe
+    // Mettre à jour le statut de stock pour chaque véhicule
+    await Promise.all(props.selectedVehicles.map(vehicle => {
+      const stockItem = {
         vehicle_id: vehicle.id,
         status: selectedStatus.value,
-        updated_at: new Date().toISOString()
+        ...(showAdditionalFields.value && {
+          location: form.value.location,
+          notes: form.value.notes
+        })
       }
-    })
-
-    console.log('Updates:', updates)
-
-    const { error } = await supabase
-      .from('vehicle_status')
-      .upsert(updates, { onConflict: 'id' })
-
-    if (error) throw error
+      return stockStore.updateStockItem(vehicle.id, stockItem)
+    }))
 
     toast({
       title: 'Statut mis à jour',
       description: `Le statut de ${selectedCount.value} véhicule(s) a été mis à jour avec succès.`
     })
 
-    emit('status-updated', props.selectedVehicles)
+    emit('status-updated')
     emit('update:modelValue', false)
   } catch (error: any) {
     console.error('Error:', error)

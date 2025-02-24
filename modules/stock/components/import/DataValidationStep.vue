@@ -61,6 +61,38 @@
                     </SelectContent>
                 </Select>
             </div>
+
+            <!-- Nouveau bloc pour le total et le type d'import -->
+            <div class="flex items-center justify-between border-t pt-4 mt-4">
+                <div class="flex items-center space-x-2">
+                    <div class="text-sm font-medium">Total véhicules : {{ getTotalVehicles() }}</div>
+                    <Tooltip>
+                        <TooltipTrigger>
+                            <Info class="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Nombre total de véhicules en tenant compte des quantités</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </div>
+
+                <div class="flex items-center space-x-4">
+                    <Label class="text-sm">Type d'import :</Label>
+                    <Select v-model="importType">
+                        <SelectTrigger class="w-[200px]">
+                            <SelectValue placeholder="Sélectionner le type d'import" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="vehicles_only">
+                                Véhicules uniquement
+                            </SelectItem>
+                            <SelectItem value="vehicles_and_stock">
+                                Véhicules et entrées en stock
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
         </div>
 
         <!-- Table avec scroll -->
@@ -81,12 +113,20 @@
                     <TableBody>
                         <TableRow v-for="(row, index) in localData" :key="index">
                             <TableCell class="sticky left-0 bg-background z-20">
-                                <input type="checkbox" v-model="row.selected" @change="handleRowSelection(row)"
-                                    class="h-4 w-4" />
+                                <input type="checkbox" v-model="row.selected" class="h-4 w-4" @change="handleValidationComplete" />
                             </TableCell>
-                            <TableCell v-for="field in displayFields" :key="field.key" class="p-0">
-                                <template v-if="field.type === 'select' && field.key === 'country_id'">
-                                    <Select v-model="row[field.key]">
+                            <TableCell v-for="field in displayFields" :key="field.key" class="text-xs py-2 px-2">
+                                <template v-if="field.key === 'qty'">
+                                    <Input 
+                                        type="number" 
+                                        v-model="row[field.key]" 
+                                        class="h-8 text-xs w-[60px]" 
+                                        min="1"
+                                        @change="handleValidationComplete"
+                                    />
+                                </template>
+                                <template v-else-if="field.type === 'select' && field.key === 'country_id'">
+                                    <Select v-model="row[field.key]" @change="handleValidationComplete">
                                         <SelectTrigger class="h-7 text-xs border-0">
                                             <SelectValue placeholder="Sélectionner un pays" />
                                         </SelectTrigger>
@@ -103,8 +143,12 @@
                                     </Select>
                                 </template>
                                 <template v-else>
-                                    <Input v-model="row[field.key]" :placeholder="field.placeholder"
-                                        class="h-7 text-xs border-0 focus:ring-0 focus:ring-offset-0" />
+                                    <Input 
+                                        v-model="row[field.key]" 
+                                        :placeholder="field.placeholder"
+                                        class="h-7 text-xs border-0 focus:ring-0 focus:ring-offset-0" 
+                                        @change="handleValidationComplete"
+                                    />
                                 </template>
                             </TableCell>
                         </TableRow>
@@ -147,6 +191,12 @@ import { useToast } from '@/components/ui/toast/use-toast'
 import { Label } from '@/components/ui/label'
 import { format, parse } from 'date-fns'
 import { fr } from 'date-fns/locale'
+import { AlertCircle, Info } from 'lucide-vue-next'
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface Country {
     id: number
@@ -161,7 +211,7 @@ interface Props {
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
-    (e: 'validation-complete', data: { data: any[], supplier: Supplier | null }): void
+    (e: 'validation-complete', data: { data: any[], supplier: Supplier | null, importType: 'vehicles_only' | 'vehicles_and_stock' }): void
 }>()
 
 // État local
@@ -175,6 +225,7 @@ const { toast } = useToast()
 const showSupplierDialog = ref(false)
 const selectedSupplier = ref<Supplier | null>(null)
 const selectedStatus = ref<VehicleStatusEnum>(VehicleStatusEnum.IN_OFFER)
+const importType = ref<'vehicles_only' | 'vehicles_and_stock'>('vehicles_only')
 
 // Nouveaux états pour la gestion du pays
 const countries = ref<Country[]>([])
@@ -186,11 +237,11 @@ const fetchCountries = async () => {
     try {
         const { data, error } = await supabase
             .from('countries')
-            .select('id, name, iso_code_2, flag_emoji')
+            .select('id, name, iso_code_2 as code, flag_emoji')
             .order('name')
         
         if (error) throw error
-        if (data) countries.value = data
+        if (data) countries.value = data as Country[]
     } catch (error) {
         console.error('Erreur lors du chargement des pays:', error)
         toast({
@@ -206,6 +257,7 @@ const fetchCountries = async () => {
 // Configuration des champs
 const displayFields = [
     // Informations principales
+    { key: 'qty', label: 'Qté', width: 'min-w-[60px]', placeholder: 'Quantité', type: 'number' },
     { key: 'brand', label: 'Marque', width: 'min-w-[120px]', placeholder: 'Marque' },
     { key: 'model', label: 'Modèle', width: 'min-w-[120px]', placeholder: 'Modèle' },
     { key: 'version', label: 'Version', width: 'min-w-[150px]', placeholder: 'Version' },
@@ -262,6 +314,7 @@ const statusOptions = [
 
 // Champs disponibles pour le bulk edit
 const bulkEditFields = [
+    { value: 'qty', label: 'Quantité' },
     { value: 'brand', label: 'Marque' },
     { value: 'model', label: 'Modèle' },
     { value: 'version', label: 'Version' },
@@ -348,20 +401,20 @@ const handleSupplierSelected = (supplier: Supplier) => {
     handleValidationComplete()
 }
 
+const getTotalVehicles = () => {
+    return localData.value.reduce((total, row) => {
+        return total + (parseInt(row.qty) || 1)
+    }, 0)
+}
+
 const handleValidationComplete = () => {
-    // Log pour voir les données avant émission
-    console.log('Status sélectionné:', selectedStatus.value)
-    console.log('Supplier sélectionné:', selectedSupplier.value)
-    
     const validatedData = {
         data: localData.value.map(row => {
             // Fonction pour formater la date
             const formatDate = (dateStr: string) => {
                 if (!dateStr) return null
                 try {
-                    // Parse la date au format DD/MM/YYYY
                     const parsedDate = parse(dateStr, 'dd/MM/yyyy', new Date())
-                    // Retourne au format YYYY-MM-DD
                     return format(parsedDate, 'yyyy-MM-dd')
                 } catch (error) {
                     console.error('Erreur de parsing de date:', error)
@@ -369,50 +422,41 @@ const handleValidationComplete = () => {
                 }
             }
 
-            // Construction des détails du véhicule
-            const details = {
-                status_details: {
-                    status: selectedStatus.value,
-                    location: row.vehicle_location || '',
-                    is_online: false,
-                    exposed_id: null
-                },
-                price_details: {
-                    purchase_price_ht: parseFloat(row.vehicle_price_ht) || 0,
-                    selling_price_ht: parseFloat(row.vehicle_selling_price_ht) || 0,
-                    vat_rate: parseFloat(row.vehicle_vat_rate) || 20,
-                    repair_cost: parseFloat(row.vehicle_repair_cost) || 0,
-                    frevo: parseFloat(row.vehicle_frevo) || 0
-                },
-                ownership: selectedSupplier.value ? [{
-                    company_id: parseInt(selectedSupplier.value.id),
-                    ownership_type: 'supplier',
-                    start_date: new Date().toISOString(),
-                    is_primary: true,
-                    notes: '',
-                    created_by: 'system',
-                    updated_by: 'system'
-                }] : []
-            }
-
-            console.log('Détails du prix:', details.price_details)
-            console.log('Détails du statut:', details.status_details)
-            console.log('Données brutes de la ligne:', row)
-
-            const updatedRow = {
+            return {
                 ...row,
+                qty: parseInt(row.qty) || 1,
                 registration_date: formatDate(row.registration_date),
                 status: selectedStatus.value,
-                details
+                details: {
+                    status_details: {
+                        status: selectedStatus.value,
+                        location: row.vehicle_location || '',
+                        is_online: false,
+                        exposed_id: null
+                    },
+                    price_details: {
+                        purchase_price_ht: parseFloat(row.vehicle_price_ht) || 0,
+                        selling_price_ht: parseFloat(row.vehicle_selling_price_ht) || 0,
+                        vat_rate: parseFloat(row.vehicle_vat_rate) || 20,
+                        repair_cost: parseFloat(row.vehicle_repair_cost) || 0,
+                        frevo: parseFloat(row.vehicle_frevo) || 0
+                    },
+                    ownership: selectedSupplier.value ? [{
+                        company_id: parseInt(selectedSupplier.value.id),
+                        ownership_type: 'supplier',
+                        start_date: new Date().toISOString(),
+                        is_primary: true,
+                        notes: '',
+                        created_by: 'system',
+                        updated_by: 'system'
+                    }] : []
+                }
             }
-
-            console.log('Ligne validée complète:', updatedRow)
-            return updatedRow
         }),
-        supplier: selectedSupplier.value
+        supplier: selectedSupplier.value,
+        importType: importType.value
     }
     
-    console.log('Données complètes émises:', validatedData)
     emit('validation-complete', validatedData)
 }
 

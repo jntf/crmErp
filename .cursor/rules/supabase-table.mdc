@@ -1,0 +1,8 @@
+---
+description: Règle qui gère la construction des tables de la base de données via des migrations
+globs: supabase/migrations/**.sql
+alwaysApply: false
+---
+
+Toutes les migrations permettent de créer les tables et les fonctions stockées dans supabase. 
+Toujours créer ou modifier un fichier pour les changements dans la base de données. 

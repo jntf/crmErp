@@ -1,0 +1,9 @@
+---
+description: Règle spécifique à l’utilisation de Supabase pour l’authentification et les requêtes. Empêche l’import manuel du client Supabase et rappelle l’approche recommandée.
+globs: **/*.vue **/*.ts **/server/api/** **/composables/**
+---
+# Supabase Usage
+- Interdiction d'utiliser : import { useSupabaseClient } from '#supabase/client'
+- Toujours utiliser : const supabase = useSupabaseClient()
+- Vérifier que toutes les opérations d’authentification et de requêtes se font via supabase.
+- Gérer systématiquement les erreurs (try/catch ou .catch) pour chaque requête vers Supabase.

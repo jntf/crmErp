@@ -1,0 +1,10 @@
+---
+description: Règle relative à l’utilisation de Tailwind CSS et de shadcn pour unifier l’interface utilisateur.
+globs: **/*.vue
+---
+
+# UI & Styling
+- Utiliser shadcn comme base de design pour les composants UI. Tous les composants sont dans /components/ui/*
+- Éviter d’introduire d’autres librairies UI sans raison valable.
+- Optimiser l’utilisation de Tailwind en regroupant logiquement les classes (ne pas multiplier les classes identiques sur un même élément).
+- Favoriser la création de composants réutilisables basés sur shadcn pour uniformiser le design.

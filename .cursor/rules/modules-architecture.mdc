@@ -1,0 +1,11 @@
+---
+description: Règle qui impose une organisation modulaire (ERP/CRM) et rappelle l’objectif principal : automatiser les processus de vente et de gestion des offres.
+globs: modules/**
+---
+
+# Modules & Architecture
+- Chaque module doit correspondre à un domaine métier (gestion des offres, clients, facturation, etc.).
+- Utiliser la module.ts dans chaque module pour le routage. 
+- Regrouper la logique métier dans des composables spécifiques (use<NomModule>).
+- Minimiser les dépendances croisées entre modules : favoriser l’injection ou les événements pour la communication inter-modules.
+- Documenter les modules avec un README ou des commentaires décrivant leur usage et leurs points d’extension.

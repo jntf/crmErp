@@ -121,6 +121,7 @@ const props = defineProps<{
 interface ValidationData {
     data: any[]
     supplier: any
+    importType: string
 }
 
 interface OwnershipData {
@@ -151,6 +152,7 @@ const mappedData = ref<any[]>([])
 const workbook = ref<ExcelJS.Workbook | null>(null)
 const rawData = ref<any[]>([])
 const selectedSupplier = ref<any | null>(null)
+const importType = ref<string>('vehicles_only')
 
 const supabase = useSupabaseClient()
 
@@ -282,62 +284,88 @@ const nextStep = () => {
 const handleValidationComplete = (validatedData: ValidationData) => {
     mappedData.value = validatedData.data
     selectedSupplier.value = validatedData.supplier
+    importType.value = validatedData.importType
 }
 
 const handleImport = async () => {
     if (!mappedData.value.length) return
 
     try {
-        const vehiclesData = mappedData.value.map(vehicleData => {
-            return {
-                ...vehicleData,
-                year: parseInt(vehicleData.year),
-                mileage: parseInt(vehicleData.mileage),
-                details: {
-                    price_details: {
-                        purchase_price_ht: parseInt(vehicleData.vehicle_price_ht) || 0,
-                        selling_price_ht: parseInt(vehicleData.vehicle_selling_price_ht) || 0,
-                        vat_rate: parseInt(vehicleData.vehicle_vat_rate) || 20,
-                        repair_cost: parseInt(vehicleData.vehicle_repair_cost) || 0,
-                        frevo: parseInt(vehicleData.vehicle_frevo) || 0
-                    },
-                    status_details: vehicleData.details?.status_details || {
-                        status: vehicleData.status,
-                        location: vehicleData.vehicle_location || '',
-                        is_online: false,
-                        exposed_id: null
-                    },
-                    features: {
-                        serie: vehicleData.serie_equipments ? 
-                            (vehicleData.serie_equipments as string).split(',').map((s: string) => s.trim()) : [],
-                        options: vehicleData.option_equipments ? 
-                            (vehicleData.option_equipments as string).split(',').map((s: string) => s.trim()) : []
-                    },
-                    ownership: vehicleData.details?.ownership || (selectedSupplier.value ? [{
-                        company_id: parseInt(selectedSupplier.value.id),
-                        ownership_type: 'supplier',
-                        start_date: new Date().toISOString(),
-                        is_primary: true,
-                        notes: '',
-                        created_by: 'system',
-                        updated_by: 'system'
-                    }] : [])
-                }
+        const vehiclesData = mappedData.value.map(vehicleData => ({
+            ...vehicleData,
+            qty: parseInt(vehicleData.qty) || 1,
+            year: parseInt(vehicleData.year),
+            mileage: parseInt(vehicleData.mileage),
+            details: {
+                price_details: {
+                    purchase_price_ht: parseInt(vehicleData.vehicle_price_ht) || 0,
+                    selling_price_ht: parseInt(vehicleData.vehicle_selling_price_ht) || 0,
+                    vat_rate: parseInt(vehicleData.vehicle_vat_rate) || 20,
+                    repair_cost: parseInt(vehicleData.vehicle_repair_cost) || 0,
+                    frevo: parseInt(vehicleData.vehicle_frevo) || 0
+                },
+                status_details: vehicleData.details?.status_details || {
+                    status: vehicleData.status,
+                    location: vehicleData.vehicle_location || '',
+                    is_online: false,
+                    exposed_id: null
+                },
+                features: {
+                    serie: vehicleData.serie_equipments ? 
+                        (vehicleData.serie_equipments as string).split(',').map((s: string) => s.trim()) : [],
+                    options: vehicleData.option_equipments ? 
+                        (vehicleData.option_equipments as string).split(',').map((s: string) => s.trim()) : []
+                },
+                ownership: vehicleData.details?.ownership || (selectedSupplier.value ? [{
+                    company_id: parseInt(selectedSupplier.value.id),
+                    ownership_type: 'supplier',
+                    start_date: new Date().toISOString(),
+                    is_primary: true,
+                    notes: '',
+                    created_by: 'system',
+                    updated_by: 'system'
+                }] : [])
             }
-        })
+        }))
 
-        const { data, error } = await supabase.rpc('save_vehicles', {
+        // Sauvegarder les véhicules
+        const { data: savedVehicles, error: vehicleError } = await supabase.rpc('save_vehicles', {
             vehicles_data: vehiclesData
         } as any)
 
-        if (error) throw error
+        if (vehicleError) throw vehicleError
+
+        // Si l'option "vehicles_and_stock" est sélectionnée, créer les entrées en stock
+        if (importType.value === 'vehicles_and_stock' && savedVehicles) {
+            const stockEntries = savedVehicles.flatMap(vehicle => {
+                const entries = []
+                const qty = vehicle.qty || 1
+                
+                // Créer une entrée en stock pour chaque unité
+                for (let i = 0; i < qty; i++) {
+                    entries.push({
+                        vehicle_id: vehicle.id,
+                        status: vehicle.details.status_details.status,
+                        location: vehicle.details.status_details.location || '',
+                        notes: ''
+                    })
+                }
+                return entries
+            })
+
+            await Promise.all(stockEntries.map(entry => stockStore.createStockItem(entry)))
+        }
+
+        const totalVehicles = vehiclesData.reduce((total, vehicle) => total + (vehicle.qty || 1), 0)
 
         toast({
             title: 'Import réussi',
-            description: `${vehiclesData.length} véhicules ont été importés avec succès`
+            description: `${vehiclesData.length} modèle(s) (${totalVehicles} véhicule(s)) ont été importés avec succès${
+                importType.value === 'vehicles_and_stock' ? ' et ajoutés au stock' : ''
+            }`
         })
 
-        emit('import-complete', data)
+        emit('import-complete', savedVehicles)
         emit('update:modelValue', false)
     } catch (error: any) {
         toast({
@@ -376,6 +404,7 @@ watch(() => props.modelValue, (newValue) => {
         workbook.value = null
         rawData.value = []
         selectedSupplier.value = null
+        importType.value = 'vehicles_only'
     }
 })
 </script>

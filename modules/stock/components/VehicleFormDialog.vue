@@ -74,6 +74,33 @@
                   type="date"
                 />
               </div>
+
+              <!-- Quantité -->
+              <div class="space-y-2">
+                <Label>Quantité</Label>
+                <div class="flex items-center space-x-2">
+                  <Input
+                    v-model="form.qty"
+                    type="number"
+                    min="1"
+                    :placeholder="isEditing ? String(form.qty || 1) : '1'"
+                    :disabled="isEditing"
+                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <Info class="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent v-if="isEditing">
+                      La quantité ne peut pas être modifiée après la création
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <p class="text-sm text-muted-foreground">
+                  Utilisé pour les commandes en lot
+                </p>
+              </div>
             </div>
           </TabsContent>
 
@@ -222,8 +249,17 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import type { Vehicle } from '../types'
+import type { Vehicle, VehicleCreate } from '../types'
 import { VehicleStatusEnum } from '../types'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Info } from 'lucide-vue-next'
+import { Spinner } from '@/components/ui/spinner'
 
 // Props
 const props = defineProps<{
@@ -234,56 +270,54 @@ const props = defineProps<{
 // Emits
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
-  (e: 'save', vehicle: Vehicle): void
+  (e: 'save', vehicle: VehicleCreate): void
   (e: 'close'): void
 }>()
 
 // État
 const loading = ref(false)
-const form = ref<Partial<Vehicle>>({
-  source: 'manual',
+const form = ref<VehicleCreate>({
+  brand: '',
+  model: '',
   status: VehicleStatusEnum.IN_STOCK,
-  ...props.vehicle
+  qty: 1
 })
+
+// Si on est en mode édition, on pré-remplit le formulaire
+if (props.vehicle) {
+  form.value = {
+    ...props.vehicle,
+    qty: props.vehicle.qty || 1
+  }
+}
 
 // Computed
 const isEditing = computed(() => !!props.vehicle)
 
 // Méthodes
-const formatStatus = (status: VehicleStatusEnum) => {
-  const statusMap: Record<VehicleStatusEnum, string> = {
-    [VehicleStatusEnum.IN_STOCK]: 'En stock',
-    [VehicleStatusEnum.IN_OFFER]: 'En offre',
-    [VehicleStatusEnum.RESERVED]: 'Réservé',
-    [VehicleStatusEnum.SOLD]: 'Vendu',
-    [VehicleStatusEnum.EXPOSED]: 'Exposé'
-  }
-  return statusMap[status]
-}
-
 const handleSubmit = async () => {
   loading.value = true
   try {
-    emit('save', form.value as Vehicle)
+    emit('save', form.value)
   } finally {
     loading.value = false
   }
 }
 
-// Reset form on close
-watch(() => props.modelValue, (newValue) => {
-  if (!newValue) {
-    form.value = {
-      source: 'manual',
-      status: VehicleStatusEnum.IN_STOCK
-    }
+const formatStatus = (status: VehicleStatusEnum): string => {
+  const statusLabels: Record<VehicleStatusEnum, string> = {
+    [VehicleStatusEnum.IN_STOCK]: 'En stock',
+    [VehicleStatusEnum.IN_OFFER]: 'En offre',
+    [VehicleStatusEnum.IN_TRADING]: 'En négociation',
+    [VehicleStatusEnum.IN_DEALING]: 'En commande',
+    [VehicleStatusEnum.RESERVED]: 'Réservé',
+    [VehicleStatusEnum.SOLD]: 'Vendu',
+    [VehicleStatusEnum.EXPOSED]: 'Exposé',
+    [VehicleStatusEnum.IN_TRANSIT]: 'En transit',
+    [VehicleStatusEnum.DELIVERED]: 'Livré',
+    [VehicleStatusEnum.BILLED]: 'Facturé',
+    [VehicleStatusEnum.ARCHIVED]: 'Archivé'
   }
-})
-
-// Update form when vehicle changes
-watch(() => props.vehicle, (newValue) => {
-  if (newValue) {
-    form.value = { ...newValue }
-  }
-}, { deep: true })
+  return statusLabels[status] || status
+}
 </script> 

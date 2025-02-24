@@ -48,6 +48,7 @@ export interface Vehicle {
   vat_rate?: number
   repair_cost?: number
   frevo?: number
+  qty: number
   created_at?: string
   updated_at?: string
   details?: VehicleDetails
@@ -258,6 +259,15 @@ export interface VehicleCreate {
     color?: string
     vin?: string
     registration_number?: string
+    registration_date?: string
+    power_hp?: number
+    power_fiscal?: number
+    co2_emissions?: number
+    purchase_price_ht?: number
+    selling_price_ht?: number
+    repair_cost?: number
+    frevo?: number
     status: VehicleStatusEnum
+    qty?: number
     details?: VehicleDetailsCreate
 }

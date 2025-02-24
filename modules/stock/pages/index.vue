@@ -21,6 +21,7 @@
             @create-order="handleCreateOrder"
             @import-excel="handleImportExcel"
             @manage-equipment="handleManageEquipment"
+            @manage-stock="handleManageStock"
         />
 
         <!-- Table principale -->
@@ -101,6 +102,13 @@
             @save="handleEquipmentSave"
             @update:modelValue="(val) => showEquipmentModal = val"
         />
+
+        <!-- Modal de gestion du stock -->
+        <StockManagementDialog
+            v-model="showStockModal"
+            :selected-vehicles="selectedVehicles"
+            @stock-updated="handleStockUpdated"
+        />
     </div>
 </template>
 
@@ -121,6 +129,7 @@ import CommercialOfferDialog from '../components/CommercialOfferDialog.vue'
 import SupplierSelectionDialog from '../components/SupplierSelectionDialog.vue'
 import ImportExcelDialog from '../components/ImportExcelDialog.vue'
 import EquipmentDialog from '../components/EquipmentDialog.vue'
+import StockManagementDialog from '../components/StockManagementDialog.vue'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 
@@ -137,6 +146,7 @@ const showOfferModal = ref(false)
 const showSupplierModal = ref(false)
 const showImportModal = ref(false)
 const showEquipmentModal = ref(false)
+const showStockModal = ref(false)
 const selectedVehicle = ref<Vehicle | null>(null)
 const selectedVehicles = ref<Vehicle[]>([])
 const searchState = ref({
@@ -181,6 +191,17 @@ const columns = [
         className: 'htCenter',
         renderer(instance: any, td: any, row: any, col: any, prop: any, value: any) {
             td.innerHTML = cellRenderers.status(value);
+            return td;
+        }
+    },
+    {
+        data: 'qty',
+        title: 'Qté',
+        type: 'numeric',
+        width: 60,
+        className: 'htCenter',
+        renderer(instance: any, td: any, row: any, col: any, prop: any, value: any) {
+            td.innerHTML = value || 1;
             return td;
         }
     },
@@ -920,6 +941,18 @@ const handleEquipmentSave = async (serie: string[], options: string[]) => {
 watch(showEquipmentModal, (newVal) => {
     // console.log('showEquipmentModal changed:', newVal)
 })
+
+const handleManageStock = () => {
+    showStockModal.value = true
+}
+
+const handleStockUpdated = async () => {
+    await vehicleStore.fetchVehicles()
+    toast({
+        title: 'Stock mis à jour',
+        description: 'Les informations de stock ont été mises à jour avec succès'
+    })
+}
 </script>
 
 <style>
