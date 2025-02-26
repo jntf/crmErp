@@ -13,6 +13,7 @@
         <!-- Barre d'actions latérale -->
         <VehicleActions 
             :has-selection="selectedVehicles.length > 0"
+            :selected-vehicles="selectedVehicles"
             @update-status="handleUpdateStatus"
             @delete-selection="handleDeleteRequest"
             @export-excel="() => handleExport('xlsx')"
@@ -720,7 +721,7 @@ const handleChangeSupplier = async () => {
     showSupplierModal.value = true
 }
 
-const handleCreateOrder = () => {
+const handleCreateOrder = (quantities?: Record<string, number>) => {
     if (selectedVehicles.value.length === 0) {
         toast({
             title: "Aucun véhicule sélectionné",
@@ -730,15 +731,48 @@ const handleCreateOrder = () => {
         return
     }
     
-    // Redirection vers la création de commande avec les véhicules sélectionnés
-    const vehicleIds = selectedVehicles.value.map(v => v.id)
-    router.push({
-        path: '/orders/new',
-        query: {
-            vehicles: vehicleIds.join(','),
-            type: 'B2B' // Type par défaut pour une commande depuis le stock
+    if (quantities) {
+        // Utilisation des quantités sélectionnées dans le dialogue
+        const vehicleIds = Object.keys(quantities)
+        const vehiclesWithQuantities = vehicleIds.map(id => {
+            const vehicle = selectedVehicles.value.find(v => v.id === id)
+            const quantity = quantities[id]
+            return { vehicle, quantity }
+        }).filter(item => item.vehicle && item.quantity > 0)
+        
+        if (vehiclesWithQuantities.length === 0) {
+            toast({
+                title: "Aucune quantité sélectionnée",
+                description: "Veuillez sélectionner au moins une quantité",
+                variant: "destructive"
+            })
+            return
         }
-    })
+        
+        // Construction de la query string avec les véhicules et leurs quantités
+        const queryParams = vehiclesWithQuantities.map(item => 
+            `${item.vehicle?.id}:${item.quantity}`
+        ).join(',')
+        
+        // Redirection vers la création de commande avec les véhicules et quantités
+        router.push({
+            path: '/orders/new',
+            query: {
+                vehicles_with_qty: queryParams,
+                type: 'B2B' // Type par défaut pour une commande depuis le stock
+            }
+        })
+    } else {
+        // Ancienne méthode (redirection simple sans quantités)
+        const vehicleIds = selectedVehicles.value.map(v => v.id)
+        router.push({
+            path: '/orders/new',
+            query: {
+                vehicles: vehicleIds.join(','),
+                type: 'B2B' // Type par défaut pour une commande depuis le stock
+            }
+        })
+    }
 }
 
 const handleSupplierSelected = async () => {

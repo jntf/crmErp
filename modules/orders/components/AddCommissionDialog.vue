@@ -1,3 +1,33 @@
+<!--
+/**
+ * Composant de dialogue pour l'ajout de commissions
+ * 
+ * Ce composant permet d'ajouter des commissions à un ou plusieurs articles de commande.
+ * Il gère la sélection du type de commission, du bénéficiaire et le calcul du montant
+ * selon les règles définies pour chaque type de commission.
+ * 
+ * @component
+ * 
+ * Props:
+ * - open: Contrôle l'affichage du dialogue
+ * - ownerId: ID du propriétaire actuel
+ * - orderItems: Liste des articles de commande disponibles pour l'ajout de commissions
+ * - contacts: Liste des contacts disponibles comme bénéficiaires
+ * - companies: Liste des entreprises disponibles comme bénéficiaires
+ * 
+ * Events:
+ * - update:open: Émis lorsque l'état d'ouverture du dialogue change
+ * - add: Émis lorsqu'une commission est ajoutée, avec les données de la commission
+ * 
+ * Fonctionnalités:
+ * - Sélection du type de commission
+ * - Sélection du bénéficiaire (propriétaire, contact ou entreprise)
+ * - Calcul automatique du montant selon le type (pourcentage ou montant fixe)
+ * - Validation des montants min/max
+ * - Application à un ou plusieurs véhicules
+ */
+-->
+
 <template>
   <Dialog :open="open" modal>
     <DialogContent class="sm:max-w-[500px]">

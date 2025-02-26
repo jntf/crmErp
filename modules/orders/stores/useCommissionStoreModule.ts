@@ -1,6 +1,19 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from '#imports'
 
+/**
+ * Store pour la gestion des commissions
+ * 
+ * Ce store gère les opérations liées aux commissions, notamment :
+ * - Récupération des commissions depuis la base de données
+ * - Filtrage des commissions par statut
+ * - Recherche de commissions
+ * - Mise à jour des statuts de facturation
+ * 
+ * Il utilise la fonction Supabase `get_commissions()` pour récupérer les données
+ * et fournit des méthodes pour manipuler ces données côté client.
+ */
+
 interface CommissionResult {
   commission_id: number
   commission_amount: number
@@ -21,6 +34,9 @@ interface CommissionResult {
   order_number: string
 }
 
+/**
+ * Interface représentant une commission avec ses relations
+ */
 interface Commission {
   commission_id: number
   commission_amount: number

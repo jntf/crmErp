@@ -91,6 +91,18 @@
                             </SelectItem>
                         </SelectContent>
                     </Select>
+                    <Tooltip>
+                        <TooltipTrigger>
+                            <Info class="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent class="max-w-[300px]">
+                            <p>
+                                <strong>Véhicules uniquement</strong> : Importe les véhicules dans le catalogue sans créer d'entrées en stock.
+                                <br><br>
+                                <strong>Véhicules et entrées en stock</strong> : Importe les véhicules et crée automatiquement des entrées en stock pour chaque unité.
+                            </p>
+                        </TooltipContent>
+                    </Tooltip>
                 </div>
             </div>
         </div>
@@ -241,7 +253,7 @@ const fetchCountries = async () => {
             .order('name')
         
         if (error) throw error
-        if (data) countries.value = data as Country[]
+        if (data) countries.value = data as unknown as Country[]
     } catch (error) {
         console.error('Erreur lors du chargement des pays:', error)
         toast({

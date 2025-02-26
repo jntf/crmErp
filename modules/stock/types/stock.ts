@@ -1,6 +1,7 @@
 // Enum pour les statuts de stock (correspond à l'enum PostgreSQL)
 export enum VehicleStockStatus {
     ORDERED = 'ordered',
+    FACTORY_ORDER = 'factory_order',
     IN_TRANSIT = 'in_transit',
     RECEIVED = 'received',
     PREPARED = 'prepared',

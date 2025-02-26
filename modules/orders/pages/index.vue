@@ -1,3 +1,19 @@
+<!--
+/**
+ * Page principale du module Orders
+ * 
+ * Cette page affiche la liste des commandes avec un système d'onglets
+ * permettant de filtrer par type de vente. Elle sert de point d'entrée
+ * pour la gestion des commandes dans l'application.
+ * 
+ * Fonctionnalités:
+ * - Affichage des commandes dans un tableau paginé
+ * - Filtrage par type de vente via des onglets
+ * - Bouton de création de nouvelle commande
+ * - Navigation vers les détails et l'édition des commandes
+ */
+-->
+
 <template>
   <div class="p-4 space-y-6">
     <header class="flex justify-between items-center">

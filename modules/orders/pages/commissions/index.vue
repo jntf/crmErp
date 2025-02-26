@@ -1,3 +1,21 @@
+<!--
+/**
+ * Page de gestion des commissions
+ * 
+ * Cette page affiche la liste complète des commissions dans l'application
+ * et permet de les filtrer par statut de facturation. Elle sert de point
+ * d'entrée pour la gestion des commissions et factures.
+ * 
+ * Fonctionnalités:
+ * - Affichage des commissions dans un tableau détaillé
+ * - Filtrage par statut de facture (toutes, en attente, payées, annulées)
+ * - Recherche textuelle
+ * - Affichage des détails des véhicules associés
+ * - Gestion des statuts de facturation
+ * - Navigation vers les commandes associées
+ */
+-->
+
 <template>
     <div class="container mx-auto p-6 space-y-8">
         <header class="flex justify-between items-center">

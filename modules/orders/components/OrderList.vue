@@ -1,3 +1,26 @@
+<!--
+/**
+ * Composant d'affichage de la liste des commandes
+ * 
+ * Ce composant affiche la liste des commandes sous forme de tableau avec pagination,
+ * filtrage et tri. Il permet également d'accéder aux actions disponibles pour chaque commande.
+ * 
+ * @component
+ * 
+ * Props:
+ * - saleType: Type de vente à filtrer (optionnel, 'ALL' pour toutes les ventes)
+ * 
+ * Fonctionnalités:
+ * - Affichage des commandes dans un tableau paginé
+ * - Filtrage par type de vente
+ * - Recherche textuelle
+ * - Tri par colonnes
+ * - Actions contextuelles par commande (voir, modifier, supprimer)
+ * - Affichage des statuts avec badges colorés
+ * - Formatage des montants et dates
+ */
+-->
+
 <template>
   <div class="w-full">
     <div class="flex items-center py-4">

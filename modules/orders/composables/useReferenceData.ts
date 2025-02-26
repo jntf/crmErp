@@ -2,6 +2,15 @@ import { ref } from 'vue'
 import { useReferenceStore } from '../stores/useReferenceStore'
 import type { Contact, Company, Vehicle } from '../types'
 
+/**
+ * Composable pour la gestion des données de référence
+ * 
+ * Ce composable fournit des fonctions pour charger et accéder aux données de référence
+ * nécessaires pour les formulaires de commande, comme les contacts, entreprises et véhicules.
+ * Il encapsule les appels au store de référence et gère les états de chargement et d'erreur.
+ * 
+ * @returns Objet contenant les données de référence et fonctions de chargement
+ */
 export const useReferenceData = () => {
   const store = useReferenceStore()
   const contacts = ref<Contact[]>([])
@@ -10,6 +19,9 @@ export const useReferenceData = () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  /**
+   * Charge la liste des contacts depuis le store
+   */
   const fetchContacts = async () => {
     loading.value = true
     error.value = null
@@ -24,6 +36,9 @@ export const useReferenceData = () => {
     }
   }
 
+  /**
+   * Charge la liste des entreprises depuis le store
+   */
   const fetchCompanies = async () => {
     loading.value = true
     error.value = null
@@ -38,6 +53,9 @@ export const useReferenceData = () => {
     }
   }
 
+  /**
+   * Charge la liste des véhicules depuis le store
+   */
   const fetchVehicles = async () => {
     loading.value = true
     error.value = null
@@ -52,7 +70,10 @@ export const useReferenceData = () => {
     }
   }
 
-  const fetchAll = async () => {
+  /**
+   * Charge toutes les données de référence en parallèle
+   */
+  const fetchAllData = async () => {
     loading.value = true
     error.value = null
     try {
@@ -90,7 +111,7 @@ export const useReferenceData = () => {
     fetchContacts,
     fetchCompanies,
     fetchVehicles,
-    fetchAll,
+    fetchAllData,
     getContactById,
     getCompanyById,
     getVehicleById

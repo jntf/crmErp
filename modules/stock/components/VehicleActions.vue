@@ -23,10 +23,17 @@
             </TooltipProvider>
         </div>
     </div>
+
+    <CreateOrderDialog
+        :is-open="showCreateOrderDialog"
+        :vehicles="selectedVehicles || []"
+        @update:open="showCreateOrderDialog = $event"
+        @create="handleCreateOrderWithQuantities"
+    />
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import {
     ClipboardList,
     FileSpreadsheet,
@@ -45,9 +52,12 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
+import CreateOrderDialog from '@/modules/orders/components/CreateOrderDialog.vue'
+import type { Vehicle } from '../types'
 
 const props = defineProps<{
     hasSelection: boolean
+    selectedVehicles: Vehicle[]
 }>()
 
 const emit = defineEmits<{
@@ -56,11 +66,17 @@ const emit = defineEmits<{
     (e: 'exportExcel'): void
     (e: 'generateOffer'): void
     (e: 'changeSupplier'): void
-    (e: 'createOrder'): void
+    (e: 'createOrder', quantities: Record<string, number>): void
     (e: 'importExcel'): void
     (e: 'manage-equipment'): void
     (e: 'manage-stock'): void
 }>()
+
+const showCreateOrderDialog = ref(false)
+
+const handleCreateOrderWithQuantities = (quantities: Record<string, number>) => {
+    emit('createOrder', quantities)
+}
 
 const actions = computed(() => [
     {
@@ -110,7 +126,7 @@ const actions = computed(() => [
         icon: ShoppingCart,
         tooltip: 'Créer un bon de commande',
         requiresSelection: true,
-        handler: () => emit('createOrder')
+        handler: () => { showCreateOrderDialog.value = true }
     },
     {
         id: 'equipment',

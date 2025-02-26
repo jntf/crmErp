@@ -27,13 +27,29 @@
         <!-- Formulaire d'entrée en stock -->
         <div class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
-            <!-- VIN (uniquement si un seul véhicule) -->
-            <div v-if="!isMultiple" class="space-y-2">
+            <!-- VIN (uniquement si un seul véhicule et si ce n'est pas une commande usine) -->
+            <div v-if="!isMultiple && form.stockType === 'existing'" class="space-y-2">
               <Label>Numéro de série (VIN)</Label>
               <Input
                 v-model="form.vin"
                 placeholder="Ex: WF0FXXWPFFAA12345"
               />
+            </div>
+
+            <!-- Type de stock -->
+            <div class="space-y-2">
+              <Label>Type de stock</Label>
+              <Select v-model="form.stockType">
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="existing">Véhicule existant</SelectItem>
+                    <SelectItem value="factory_order">Commande usine</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
 
             <!-- Statut -->
@@ -127,6 +143,7 @@ const emit = defineEmits<{
 // Stores
 const stockStore = useVehicleStockStore()
 const { toast } = useToast()
+const supabase = useSupabaseClient()
 
 // État
 const loading = ref(false)
@@ -134,18 +151,23 @@ const form = ref({
   vin: '',
   status: VehicleStockStatus.ORDERED as VehicleStockStatus,
   location: '',
-  notes: ''
+  notes: '',
+  stockType: 'existing'
 })
 
 // Computed
 const isMultiple = computed(() => props.selectedVehicles.length > 1)
 const hasLot = computed(() => props.selectedVehicles.length === 1 && (props.selectedVehicles[0].qty || 0) > 1)
-const canSplit = computed(() => hasLot.value && form.value.vin)
+const canSplit = computed(() => {
+  if (!hasLot.value) return false
+  return form.value.stockType === 'existing' ? !!form.value.vin : true
+})
 const isEditing = computed(() => false) // Pour l'instant, on ne gère que la création
 
 // Liste des statuts de stock disponibles
 const stockStatuses = [
   { value: VehicleStockStatus.ORDERED, label: 'Commandé' },
+  { value: VehicleStockStatus.FACTORY_ORDER, label: 'Commande usine' },
   { value: VehicleStockStatus.IN_TRANSIT, label: 'En transit' },
   { value: VehicleStockStatus.RECEIVED, label: 'Reçu' },
   { value: VehicleStockStatus.PREPARED, label: 'Préparé' },
@@ -162,11 +184,16 @@ const getStatusLabel = (status: VehicleStockStatus): string => {
 const handleSubmit = async () => {
   loading.value = true
   try {
+    // Ajuster le statut en fonction du type de stock
+    if (form.value.stockType === 'factory_order') {
+      form.value.status = VehicleStockStatus.FACTORY_ORDER
+    }
+
     // Créer une entrée en stock pour chaque véhicule sélectionné
     await Promise.all(props.selectedVehicles.map(vehicle => 
       stockStore.createStockItem({
         vehicle_id: vehicle.id,
-        vin: form.value.vin,
+        vin: form.value.stockType === 'existing' ? form.value.vin : undefined,
         status: form.value.status,
         location: form.value.location,
         notes: form.value.notes
@@ -192,27 +219,37 @@ const handleSubmit = async () => {
 }
 
 const handleSplit = async () => {
-  if (!hasLot.value || !form.value.vin) return
+  if (!hasLot.value || (form.value.stockType === 'existing' && !form.value.vin)) return
 
   loading.value = true
   try {
     const vehicle = props.selectedVehicles[0]
     
+    // Ajuster le statut en fonction du type de stock
+    if (form.value.stockType === 'factory_order') {
+      form.value.status = VehicleStockStatus.FACTORY_ORDER
+    }
+    
     // Créer une entrée en stock pour le véhicule avec le VIN spécifié
     await stockStore.createStockItem({
       vehicle_id: vehicle.id,
-      vin: form.value.vin,
+      vin: form.value.stockType === 'existing' ? form.value.vin : undefined,
       status: form.value.status,
       location: form.value.location,
       notes: form.value.notes
     })
 
     // Mettre à jour la quantité du lot (-1)
-    // TODO: Implémenter la mise à jour de la quantité dans le store
+    if (vehicle.qty && vehicle.qty > 1) {
+      await supabase
+        .from('vehicles')
+        .update({ qty: vehicle.qty - 1 })
+        .eq('id', vehicle.id)
+    }
 
     toast({
       title: 'Lot dissocié',
-      description: 'Le véhicule a été dissocié du lot avec succès'
+      description: `Le véhicule a été ${form.value.stockType === 'factory_order' ? 'commandé' : 'dissocié du lot'} avec succès`
     })
 
     emit('stock-updated')

@@ -1,3 +1,25 @@
+<!--
+/**
+ * Composant d'affichage et de gestion des commissions globales
+ * 
+ * Ce composant affiche la liste complète des commissions dans l'application sous forme
+ * de tableau avec filtrage, tri et pagination. Il permet de visualiser les commissions
+ * par véhicule, bénéficiaire et statut de facturation.
+ * 
+ * @component
+ * 
+ * Fonctionnalités:
+ * - Affichage des commissions dans un tableau paginé
+ * - Filtrage par statut de facture (toutes, en attente, payées, annulées)
+ * - Recherche textuelle sur les références véhicule et bénéficiaires
+ * - Tri par colonnes
+ * - Affichage des détails des véhicules associés
+ * - Affichage des statuts de facturation avec badges colorés
+ * - Formatage des montants et dates
+ * - Actions contextuelles par commission
+ */
+-->
+
 <template>
   <div class="space-y-4">
     <!-- Filtres et options -->

@@ -110,9 +110,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast/use-toast'
 import { ColumnMappingStep, DataValidationStep } from './import'
-import { VehicleStatusEnum } from '../types'
-import { useVehicleStore } from '../stores/useVehicleStore'
-import { useSupabaseClient } from '#imports'
+import { VehicleStockStatus } from '../types/stock'
+import { useVehicleStockStore } from '../stores/useVehicleStockStore'
 
 const props = defineProps<{
     modelValue: boolean
@@ -155,6 +154,7 @@ const selectedSupplier = ref<any | null>(null)
 const importType = ref<string>('vehicles_only')
 
 const supabase = useSupabaseClient()
+const stockStore = useVehicleStockStore()
 
 const canProceed = computed(() => {
     switch (currentStep.value) {
@@ -337,15 +337,23 @@ const handleImport = async () => {
 
         // Si l'option "vehicles_and_stock" est sélectionnée, créer les entrées en stock
         if (importType.value === 'vehicles_and_stock' && savedVehicles) {
-            const stockEntries = savedVehicles.flatMap(vehicle => {
+            const stockEntries = savedVehicles.flatMap((vehicle: any) => {
                 const entries = []
                 const qty = vehicle.qty || 1
+                
+                // Déterminer le statut initial en stock
+                // Si le véhicule a un VIN, on considère qu'il est disponible
+                // Sinon, c'est une commande usine
+                const initialStatus = vehicle.vin 
+                    ? VehicleStockStatus.AVAILABLE 
+                    : VehicleStockStatus.FACTORY_ORDER
                 
                 // Créer une entrée en stock pour chaque unité
                 for (let i = 0; i < qty; i++) {
                     entries.push({
                         vehicle_id: vehicle.id,
-                        status: vehicle.details.status_details.status,
+                        status: initialStatus,
+                        vin: vehicle.vin || null, // Ajouter le VIN uniquement s'il existe
                         location: vehicle.details.status_details.location || '',
                         notes: ''
                     })
@@ -353,7 +361,7 @@ const handleImport = async () => {
                 return entries
             })
 
-            await Promise.all(stockEntries.map(entry => stockStore.createStockItem(entry)))
+            await Promise.all(stockEntries.map((entry: any) => stockStore.createStockItem(entry)))
         }
 
         const totalVehicles = vehiclesData.reduce((total, vehicle) => total + (vehicle.qty || 1), 0)

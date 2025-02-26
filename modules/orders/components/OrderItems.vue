@@ -1,3 +1,29 @@
+<!--
+/**
+ * Composant de gestion des articles de commande (véhicules)
+ * 
+ * Ce composant permet d'afficher, ajouter et modifier les véhicules dans une commande.
+ * Il gère l'affichage des informations des véhicules, les quantités, les prix et les calculs
+ * de totaux et de marges.
+ * 
+ * @component
+ * 
+ * Props:
+ * - modelValue: Liste des articles de commande à afficher et modifier
+ * - vehicles: Liste des véhicules disponibles pour l'ajout
+ * 
+ * Events:
+ * - update:modelValue: Émis lorsque la liste des articles est modifiée
+ * 
+ * Fonctionnalités:
+ * - Affichage des véhicules dans un tableau
+ * - Modification des quantités et types de stock
+ * - Calcul automatique des totaux et marges
+ * - Ajout de nouveaux véhicules via un sélecteur
+ * - Suppression d'articles de commande
+ */
+-->
+
 <template>
   <Card>
     <CardHeader class="flex justify-between items-center">
@@ -14,6 +40,7 @@
             <TableHead class="text-xs font-medium">Référence</TableHead>
             <TableHead class="text-xs font-medium">Désignation</TableHead>
             <TableHead class="text-xs font-medium w-24 text-center">Quantité</TableHead>
+            <TableHead class="text-xs font-medium w-24 text-center">Type</TableHead>
             <TableHead class="text-xs font-medium w-32 text-right">Prix d'achat HT</TableHead>
             <TableHead class="text-xs font-medium w-32 text-right">Prix de vente HT</TableHead>
             <TableHead class="text-xs font-medium w-24 text-center">TVA</TableHead>
@@ -36,9 +63,24 @@
                 v-model.number="item.quantity" 
                 type="number" 
                 min="1" 
+                :max="getMaxQuantityAvailable(item.vehicleId)"
                 class="w-16 h-8 text-xs text-center"
                 @input="updateItem(index)" 
               />
+              <div v-if="getMaxQuantityAvailable(item.vehicleId) > 1" class="text-xs text-muted-foreground mt-1">
+                Stock: {{ getMaxQuantityAvailable(item.vehicleId) }}
+              </div>
+            </TableCell>
+            <TableCell class="text-center">
+              <Select v-model="item.stockType" @update:modelValue="updateItem(index)">
+                <SelectTrigger class="w-24 h-8 text-xs">
+                  <SelectValue :placeholder="item.stockType || 'Stock'" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="existing">Stock</SelectItem>
+                  <SelectItem value="factory_order">Usine</SelectItem>
+                </SelectContent>
+              </Select>
             </TableCell>
             <TableCell class="text-right font-medium">
               {{ formatCurrency(item.purchasePriceHt) }}
@@ -113,7 +155,12 @@ import {
   TableRow,
   TableCell,
   Button,
-  Input
+  Input,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
 } from '#components'
 
 const props = defineProps<{
@@ -165,9 +212,10 @@ const addVehicles = (selectedVehicles: Vehicle[]) => {
       items.push({
         id: 0,
         orderId: 0,
-        vehicleId: vehicle.id,
+        vehicleId: vehicle.id.toString(),
         vehicleInternalId: vehicle.internal_id,
         quantity: 1,
+        stockType: 'existing', // Par défaut, utiliser le stock existant
         purchasePriceHt: vehicle.vehicle_prices?.purchase_price_ht || 0,
         unitPriceHt: vehicle.vehicle_prices?.selling_price_ht || 0,
         sellingPriceHt: vehicle.vehicle_prices?.selling_price_ht || 0,
@@ -184,5 +232,10 @@ const addVehicles = (selectedVehicles: Vehicle[]) => {
   })
 
   emit('update:modelValue', items)
+}
+
+const getMaxQuantityAvailable = (vehicleId: string) => {
+  const vehicle = props.vehicles.find(v => v.id.toString() === vehicleId)
+  return vehicle?.qty || 1
 }
 </script> 

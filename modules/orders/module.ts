@@ -1,5 +1,12 @@
 import { defineNuxtModule, createResolver, addServerHandler } from '@nuxt/kit'
 
+/**
+ * Module Nuxt pour la gestion des commandes
+ * 
+ * Ce module configure les routes, composants et imports pour le module Orders.
+ * Il s'intègre dans l'application Nuxt et expose les fonctionnalités de gestion
+ * des commandes et commissions.
+ */
 export default defineNuxtModule({
   meta: {
     name: 'orders',

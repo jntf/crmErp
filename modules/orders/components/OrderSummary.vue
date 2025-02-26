@@ -3,10 +3,14 @@
     <CardHeader>
       <CardTitle class="text-base font-semibold">Récapitulatif</CardTitle>
     </CardHeader>
-    <CardContent class="space-y-4">
-      <div class="flex justify-between items-center text-sm">
-        <span class="text-muted-foreground">Total HT</span>
-        <span class="font-medium">{{ formatCurrency(totalHT) }}</span>
+    <CardContent class="space-y-1">
+      <div class="flex justify-between text-sm">
+        <span>Nombre de véhicules</span>
+        <span>{{ totalVehicles }}</span>
+      </div>
+      <div class="flex justify-between text-sm">
+        <span>Total HT</span>
+        <span>{{ formatCurrency(totalHT) }}</span>
       </div>
       <div class="flex justify-between items-center text-sm">
         <span class="text-muted-foreground">TVA</span>
@@ -66,6 +70,10 @@ const {
 } = useOrderCalculations(
   computed(() => props.items),
   computed(() => props.commissions || [])
+)
+
+const totalVehicles = computed(() => 
+  props.items.reduce((sum, item) => sum + (item.quantity || 1), 0)
 )
 
 const showCommissions = computed(() => 

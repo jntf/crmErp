@@ -1,3 +1,30 @@
+<!--
+/**
+ * Composant d'affichage et de gestion des commissions
+ * 
+ * Ce composant permet d'afficher la liste des commissions regroupées par bénéficiaire,
+ * d'ajouter de nouvelles commissions et de supprimer des commissions existantes.
+ * 
+ * @component
+ * 
+ * Props:
+ * - modelValue: Liste des commissions à afficher
+ * - orderItems: Liste des articles de commande associés aux commissions
+ * - ownerId: ID du propriétaire actuel
+ * - contacts: Liste des contacts disponibles comme bénéficiaires
+ * - companies: Liste des entreprises disponibles comme bénéficiaires
+ * 
+ * Events:
+ * - update:modelValue: Émis lorsque la liste des commissions est modifiée
+ * 
+ * Fonctionnalités:
+ * - Affichage des commissions regroupées par bénéficiaire
+ * - Calcul des totaux par bénéficiaire
+ * - Ajout de nouvelles commissions via un dialogue
+ * - Suppression de commissions individuelles ou par groupe
+ */
+-->
+
 <template>
   <Card class="w-full">
     <CardHeader>
@@ -71,7 +98,7 @@ interface Vehicle {
   id: number
   internal_id: string
   model: string
-  vin: string
+  vin: string | null
 }
 
 interface OrderItem {
@@ -93,8 +120,8 @@ interface VehicleCommission {
   recipient?: Recipient
   order_item?: {
     id: number
-    vehicle_id: number
-    vehicle: Vehicle
+    vehicle_id?: number
+    vehicle?: Vehicle
   }
 }
 
@@ -167,15 +194,27 @@ const getRecipientName = (commission: VehicleCommission) => {
 
 // Helpers pour l'affichage
 const getVehicleReference = (orderItemId: number | null, index: number) => {
-  if (orderItemId === null || orderItemId === undefined) return ''
+  if (orderItemId === null || orderItemId === undefined) return 'Référence introuvable'
   
   // Si order_item_id vaut 0, on utilise l'index pour retrouver le bon véhicule
-  if (orderItemId === 0 && props.orderItems.length > index) {
-    return props.orderItems[index].vehicle?.internal_id || 'Référence introuvable'
+  if (orderItemId === 0 && props.orderItems.length > 0) {
+    const orderItemIndex = index % props.orderItems.length
+    return props.orderItems[orderItemIndex]?.vehicle?.internal_id || 'Référence introuvable'
   }
   
+  // Recherche par ID d'article
   const item = props.orderItems.find(i => i.id === orderItemId)
-  return item?.vehicle?.internal_id || 'Référence introuvable'
+  if (item?.vehicle?.internal_id) {
+    return item.vehicle.internal_id
+  }
+  
+  // Fallback: si l'item n'est pas trouvé, on utilise l'index pour trouver un article
+  if (props.orderItems.length > 0) {
+    const orderItemIndex = index % props.orderItems.length
+    return props.orderItems[orderItemIndex]?.vehicle?.internal_id || 'Référence introuvable'
+  }
+  
+  return 'Référence introuvable'
 }
 
 // Actions
