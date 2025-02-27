@@ -82,146 +82,27 @@
         <!-- Colonne latérale -->
         <div class="space-y-6">
           <!-- Type de vente -->
-          <Card>
-            <CardHeader>
-              <CardTitle class="text-base font-semibold">Type de vente</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select v-model="form.saleType" :disabled="!isNew">
-                <SelectTrigger>
-                  <SelectValue :placeholder="'Sélectionnez un type'" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem v-for="type in saleTypes" :key="type.value" :value="type.value">
-                      {{ type.label }}
-                    </SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
+          <SaleTypeSelector v-model="form.saleType" :disabled="!isNew" />
 
           <!-- Contact ou Entreprises -->
-          <Card>
-            <CardHeader>
-              <CardTitle class="text-base font-semibold">{{ getPartyTitle }}</CardTitle>
-            </CardHeader>
-            <CardContent class="space-y-4">
-              <template v-if="form.saleType === 'B2C'">
-                <div class="space-y-2">
-                  <Label>Contact</Label>
-                  <Select v-model="contactIdStr">
-                    <SelectTrigger>
-                      <SelectValue :placeholder="'Sélectionnez un contact'" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem v-for="contact in contacts" :key="contact.id" :value="contact.id.toString()">
-                          {{ contact.name }}
-                        </SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </template>
-
-              <template v-else-if="form.saleType === 'B2B'">
-                <div class="space-y-2">
-                  <Label>Entreprise acheteuse</Label>
-                  <Combobox by="label" v-model="buyerCompanyIdStr">
-                    <ComboboxAnchor>
-                      <div class="relative w-full items-center">
-                        <ComboboxInput
-                          :display-value="(val) => companies.find(c => c.id.toString() === val)?.name ?? ''"
-                          placeholder="Sélectionnez une entreprise..." />
-                        <ComboboxTrigger class="absolute end-0 inset-y-0 flex items-center justify-center px-3">
-                          <ChevronsUpDown class="size-4 text-muted-foreground" />
-                        </ComboboxTrigger>
-                      </div>
-                    </ComboboxAnchor>
-                    <ComboboxList>
-                      <ComboboxEmpty>
-                        Aucune entreprise trouvée.
-                      </ComboboxEmpty>
-                      <ComboboxGroup>
-                        <ComboboxItem v-for="company in companies" :key="company.id" :value="company.id.toString()">
-                          {{ company.name }}
-                          <ComboboxItemIndicator>
-                            <Check :class="cn('ml-auto h-4 w-4')" />
-                          </ComboboxItemIndicator>
-                        </ComboboxItem>
-                      </ComboboxGroup>
-                    </ComboboxList>
-                  </Combobox>
-                </div>
-              </template>
-
-              <template v-else-if="form.saleType === 'B2B2B'">
-                <div class="space-y-4">
-                  <div class="space-y-2">
-                    <Label>Entreprise acheteuse</Label>
-                    <Combobox by="label" v-model="buyerCompanyIdStr">
-                      <ComboboxAnchor>
-                        <div class="relative w-full items-center">
-                          <ComboboxInput
-                            :display-value="(val) => companies.find(c => c.id.toString() === val)?.name ?? ''"
-                            placeholder="Sélectionnez une entreprise..." />
-                          <ComboboxTrigger class="absolute end-0 inset-y-0 flex items-center justify-center px-3">
-                            <ChevronsUpDown class="size-4 text-muted-foreground" />
-                          </ComboboxTrigger>
-                        </div>
-                      </ComboboxAnchor>
-                      <ComboboxList>
-                        <ComboboxEmpty>
-                          Aucune entreprise trouvée.
-                        </ComboboxEmpty>
-                        <ComboboxGroup>
-                          <ComboboxItem v-for="company in companies" :key="company.id" :value="company.id.toString()">
-                            {{ company.name }}
-                            <ComboboxItemIndicator>
-                              <Check :class="cn('ml-auto h-4 w-4')" />
-                            </ComboboxItemIndicator>
-                          </ComboboxItem>
-                        </ComboboxGroup>
-                      </ComboboxList>
-                    </Combobox>
-                  </div>
-                  <div class="space-y-2">
-                    <Label>Entreprise vendeuse</Label>
-                    <Combobox by="label" v-model="sellerCompanyIdStr">
-                      <ComboboxAnchor>
-                        <div class="relative w-full items-center">
-                          <ComboboxInput
-                            :display-value="(val) => companies.find(c => c.id.toString() === val)?.name ?? ''"
-                            placeholder="Sélectionnez une entreprise..." />
-                          <ComboboxTrigger class="absolute end-0 inset-y-0 flex items-center justify-center px-3">
-                            <ChevronsUpDown class="size-4 text-muted-foreground" />
-                          </ComboboxTrigger>
-                        </div>
-                      </ComboboxAnchor>
-                      <ComboboxList>
-                        <ComboboxEmpty>
-                          Aucune entreprise trouvée.
-                        </ComboboxEmpty>
-                        <ComboboxGroup>
-                          <ComboboxItem v-for="company in companies" :key="company.id" :value="company.id.toString()">
-                            {{ company.name }}
-                            <ComboboxItemIndicator>
-                              <Check :class="cn('ml-auto h-4 w-4')" />
-                            </ComboboxItemIndicator>
-                          </ComboboxItem>
-                        </ComboboxGroup>
-                      </ComboboxList>
-                    </Combobox>
-                  </div>
-                </div>
-              </template>
-            </CardContent>
-          </Card>
+          <PartySelector 
+            :sale-type="form.saleType"
+            :contact-id="form.contactId"
+            :buyer-company-id="form.buyerCompanyId"
+            :seller-company-id="form.sellerCompanyId"
+            :seller-contact-id="form.sellerContactId"
+            :contacts="contacts"
+            :companies="companies"
+            @update:contact-id="form.contactId = $event"
+            @update:buyer-company-id="form.buyerCompanyId = $event"
+            @update:seller-company-id="form.sellerCompanyId = $event"
+            @update:seller-contact-id="form.sellerContactId = $event"
+          />
 
           <!-- Commissions -->
-          <CommissionList v-if="['B2B2B', 'B2P', 'P2P'].includes(form.saleType)" v-model="form.commissions"
+          <CommissionList 
+            v-if="isIntermediationType(form.saleType)" 
+            v-model="form.commissions"
             :order-items="form.items.map(item => ({
               id: item.id,
               vehicle: item.vehicle ? {
@@ -230,7 +111,11 @@
                 model: item.vehicle.model,
                 vin: item.vehicle.vin || ''
               } : undefined
-            }))" :contacts="contacts" :companies="companies" :owner-id="currentOwnerId" />
+            }))" 
+            :contacts="contacts" 
+            :companies="companies" 
+            :owner-id="currentOwnerId" 
+          />
 
           <!-- Totaux -->
           <OrderSummary :items="form.items" :commissions="form.commissions" :display-margin="displayMargin" />
@@ -243,10 +128,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeftIcon, DownloadIcon, Check, ChevronsUpDown } from 'lucide-vue-next'
+import { ArrowLeftIcon, DownloadIcon } from 'lucide-vue-next'
 import { useOrderStore } from '@/modules/orders/stores/useOrderStore'
 import { formatDate1 } from '~/utils/formatter'
-import { cn } from '@/utils'
 import type {
   Order,
   OrderItem,
@@ -258,9 +142,12 @@ import type {
   Vehicle
 } from '../../types'
 import { useReferenceData } from '../../composables/useReferenceData'
+import { useOrderIntermediation } from '../../composables/useOrderIntermediation'
 import OrderItems from '../../components/OrderItems.vue'
 import OrderSummary from '../../components/OrderSummary.vue'
 import CommissionList from '../../components/CommissionList.vue'
+import SaleTypeSelector from '../../components/SaleTypeSelector.vue'
+import PartySelector from '../../components/PartySelector.vue'
 import { useOwnerStore } from '@/stores/useOwnerStore'
 import { useCommissionStore } from '@/stores/useCommissionStore'
 import {
@@ -269,24 +156,8 @@ import {
   CardTitle,
   CardContent,
   Button,
-  Label,
   Textarea,
-  Badge,
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Combobox,
-  ComboboxAnchor,
-  ComboboxEmpty,
-  ComboboxGroup,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxItemIndicator,
-  ComboboxList,
-  ComboboxTrigger
+  Badge
 } from '#components'
 
 const route = useRoute()
@@ -294,6 +165,8 @@ const router = useRouter()
 const store = useOrderStore()
 const ownerStore = useOwnerStore()
 const commissionStore = useCommissionStore()
+const { isIntermediationType } = useOrderIntermediation()
+
 // Récupérer le type de vente depuis la query si nouvelle commande
 const saleTypeFromQuery = computed(() => route.query.type as SaleType | undefined)
 
@@ -332,7 +205,8 @@ const form = ref<OrderFormData>({
   comments: '',
   totalHt: 0,
   totalTva: 0,
-  totalTtc: 0
+  totalTtc: 0,
+  metadata: {}
 })
 
 // Remplacer les refs contacts et companies par :
@@ -344,49 +218,6 @@ const {
   error: referencesError,
   fetchAllData: fetchReferences
 } = useReferenceData()
-
-const saleTypes = [
-  { value: 'B2C', label: 'Particulier' },
-  { value: 'B2B', label: 'Professionnel' },
-  { value: 'B2B2B', label: 'Intermediation' },
-  { value: 'B2P', label: 'Pro vers Particulier' },
-  { value: 'P2P', label: 'Particulier à Particulier' }
-]
-
-const getPartyTitle = computed(() => {
-  switch (form.value.saleType) {
-    case 'B2C':
-      return 'Contact'
-    case 'B2B':
-      return 'Entreprise'
-    case 'B2B2B':
-      return 'Entreprises'
-    default:
-      return ''
-  }
-})
-
-// Dans la partie script, ajouter les computed properties pour la conversion
-const contactIdStr = computed({
-  get: () => form.value.contactId?.toString() || '',
-  set: (value: string) => {
-    form.value.contactId = value ? Number(value) : undefined
-  }
-})
-
-const buyerCompanyIdStr = computed({
-  get: () => form.value.buyerCompanyId?.toString() || '',
-  set: (value: string) => {
-    form.value.buyerCompanyId = value ? Number(value) : undefined
-  }
-})
-
-const sellerCompanyIdStr = computed({
-  get: () => form.value.sellerCompanyId?.toString() || '',
-  set: (value: string) => {
-    form.value.sellerCompanyId = value ? Number(value) : undefined
-  }
-})
 
 // Méthodes
 const fetchOrder = async () => {
@@ -405,13 +236,15 @@ const fetchOrder = async () => {
         contactId: data.contactId,
         buyerCompanyId: data.buyerCompanyId,
         sellerCompanyId: data.sellerCompanyId,
+        sellerContactId: data.metadata?.seller_contact_id, // Récupérer depuis les métadonnées
         items: data.items || [],
         commissions: data.items?.flatMap(item => item.commissions || []) || [],
         comments: data.comments || '',
         totalHt: data.totalHt,
         totalTva: data.totalTva,
         totalTtc: data.totalTtc,
-        status: data.status
+        status: data.status,
+        metadata: data.metadata || {}
       }
     }
   } catch (error) {
@@ -470,24 +303,6 @@ const saveOrder = async () => {
   }
 }
 
-// Fonction simplifiée pour préparer les données de commande selon le type de vente
-const prepareOrderDataByType = (formData: any) => {
-  console.log('Préparation des données de commande (version simplifiée)')
-  console.log('Type de vente:', formData.saleType)
-  
-  // Retourne simplement les données du formulaire sans transformation
-  return {
-    saleType: formData.saleType,
-    contactId: formData.contactId,
-    buyerCompanyId: formData.buyerCompanyId,
-    sellerCompanyId: formData.sellerCompanyId,
-    items: formData.items,
-    commissions: formData.commissions,
-    comments: formData.comments,
-    orderDate: new Date().toISOString()
-  }
-}
-
 // Ajout des fonctions utilitaires pour le statut
 const getStatusVariant = (status?: string) => {
   switch (status) {
@@ -534,8 +349,8 @@ const downloadPdf = async () => {
 const currentOwnerId = computed<number | undefined>(() => ownerStore.idOwnerActuel === null ? undefined : ownerStore.idOwnerActuel)
 
 const displayMargin = computed(() => {
-  // Afficher la marge uniquement pour les ventes directes (B2B et B2P)
-  return form.value.saleType === 'B2B' || form.value.saleType === 'B2P'
+  // Afficher la marge uniquement pour les ventes directes (B2B)
+  return form.value.saleType === 'B2B'
 })
 
 onMounted(async () => {

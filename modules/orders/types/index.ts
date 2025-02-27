@@ -2,7 +2,15 @@
  * Types de vente supportés par le module Orders
  * @typedef {string} SaleType
  */
-export type SaleType = 'B2C' | 'B2B' | 'B2B2B' | 'B2P' | 'P2P' | 'P2B'
+export type SaleType = 
+  // Ventes directes
+  | 'B2C'    // Business to Consumer (Entreprise à Particulier)
+  | 'B2B'    // Business to Business (Entreprise à Entreprise)
+  // Ventes d'intermédiation
+  | 'B2B2B'  // Business to Business to Business (Entreprise à Entreprise via Intermédiaire)
+  | 'B2B2C'  // Business to Business to Consumer (Entreprise à Particulier via Intermédiaire)
+  | 'C2B2C'  // Consumer to Business to Consumer (Particulier à Particulier via Intermédiaire)
+  | 'C2B2B'  // Consumer to Business to Business (Particulier à Entreprise via Intermédiaire)
 
 /**
  * Statuts possibles pour une commande
@@ -289,6 +297,8 @@ export interface OrderFormData {
   buyerCompanyId?: number
   /** Identifiant de l'entreprise vendeuse (optionnel) */
   sellerCompanyId?: number
+  /** Identifiant du contact vendeur (optionnel, pour C2B2C et C2B2B) */
+  sellerContactId?: number
   /** Articles de la commande */
   items: OrderItem[]
   /** Commissions associées */
@@ -303,6 +313,8 @@ export interface OrderFormData {
   totalTtc: number
   /** Statut de la commande (optionnel) */
   status?: OrderStatus
+  /** Métadonnées additionnelles */
+  metadata?: Record<string, any>
 }
 
 /**

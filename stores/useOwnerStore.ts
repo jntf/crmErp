@@ -35,6 +35,8 @@ export const useOwnerStore = defineStore('owner', () => {
 
       donneesOwner.value = data
       idOwnerActuel.value = data.owner?.id || null
+
+      console.log('Données owner chargées:', donneesOwner.value)
       
       // Charger les settings de commission si on a un owner ID
       if (idOwnerActuel.value) {

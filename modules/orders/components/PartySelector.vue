@@ -1,122 +1,364 @@
+<!--
+/**
+ * Composant de sélection des parties impliquées dans une commande
+ * 
+ * Ce composant s'adapte en fonction du type de vente sélectionné :
+ * - B2C : Sélection d'un contact acheteur
+ * - B2B : Sélection d'une entreprise acheteuse
+ * - B2B2B : Sélection d'une entreprise acheteuse et d'une entreprise vendeuse
+ * - B2B2C : Sélection d'une entreprise vendeuse et d'un contact acheteur
+ * - C2B2C : Sélection d'un contact vendeur et d'un contact acheteur
+ * - C2B2B : Sélection d'un contact vendeur et d'une entreprise acheteuse
+ */
+-->
+
 <template>
-  <div class="space-y-4">
-    <div v-if="saleType === 'B2C'">
-      <Label>Contact</Label>
-      <Select
-        :model-value="selectedContactId?.toString()"
-        @update:model-value="updateContactId"
-        required
-      >
-        <option value="">Sélectionnez un contact</option>
-        <option v-for="contact in contacts" :key="contact.id" :value="contact.id.toString()">
-          {{ contact.name }}
-        </option>
-      </Select>
-    </div>
+  <Card>
+    <CardHeader>
+      <CardTitle class="text-base font-semibold">{{ getPartyTitle }}</CardTitle>
+    </CardHeader>
+    <CardContent class="space-y-4">
+      <!-- B2C : Contact acheteur -->
+      <template v-if="saleType === 'B2C'">
+        <div class="space-y-2">
+          <Label>Contact acheteur</Label>
+          <Select v-model="contactIdStr">
+            <SelectTrigger>
+              <SelectValue :placeholder="'Sélectionnez un contact'" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem v-for="contact in contacts" :key="contact.id" :value="contact.id.toString()">
+                  {{ contact.name }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+      </template>
 
-    <div v-else-if="saleType === 'B2B'">
-      <Label>Entreprise acheteuse</Label>
-      <Select
-        :model-value="selectedBuyerCompanyId?.toString()"
-        @update:model-value="updateBuyerCompanyId"
-        required
-      >
-        <option value="">Sélectionnez une entreprise</option>
-        <option v-for="company in companies" :key="company.id" :value="company.id.toString()">
-          {{ company.name }}
-        </option>
-      </Select>
-    </div>
+      <!-- B2B : Entreprise acheteuse -->
+      <template v-else-if="saleType === 'B2B'">
+        <div class="space-y-2">
+          <Label>Entreprise acheteuse</Label>
+          <Combobox by="label" v-model="buyerCompanyIdStr">
+            <ComboboxAnchor>
+              <div class="relative w-full items-center">
+                <ComboboxInput
+                  :display-value="(val) => companies.find(c => c.id.toString() === val)?.name ?? ''"
+                  placeholder="Sélectionnez une entreprise..." />
+                <ComboboxTrigger class="absolute end-0 inset-y-0 flex items-center justify-center px-3">
+                  <ChevronsUpDown class="size-4 text-muted-foreground" />
+                </ComboboxTrigger>
+              </div>
+            </ComboboxAnchor>
+            <ComboboxList>
+              <ComboboxEmpty>
+                Aucune entreprise trouvée.
+              </ComboboxEmpty>
+              <ComboboxGroup>
+                <ComboboxItem v-for="company in companies" :key="company.id" :value="company.id.toString()">
+                  {{ company.name }}
+                  <ComboboxItemIndicator>
+                    <Check :class="cn('ml-auto h-4 w-4')" />
+                  </ComboboxItemIndicator>
+                </ComboboxItem>
+              </ComboboxGroup>
+            </ComboboxList>
+          </Combobox>
+        </div>
+      </template>
 
-    <div v-else-if="saleType === 'B2B2B'" class="space-y-4">
-      <div>
-        <Label>Entreprise acheteuse</Label>
-        <Select
-          :model-value="selectedBuyerCompanyId?.toString()"
-          @update:model-value="updateBuyerCompanyId"
-          required
-        >
-          <option value="">Sélectionnez une entreprise</option>
-          <option v-for="company in companies" :key="company.id" :value="company.id.toString()">
-            {{ company.name }}
-          </option>
-        </Select>
-      </div>
+      <!-- B2B2B : Entreprise acheteuse + Entreprise vendeuse -->
+      <template v-else-if="saleType === 'B2B2B'">
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <Label>Entreprise acheteuse</Label>
+            <Combobox by="label" v-model="buyerCompanyIdStr">
+              <ComboboxAnchor>
+                <div class="relative w-full items-center">
+                  <ComboboxInput
+                    :display-value="(val) => companies.find(c => c.id.toString() === val)?.name ?? ''"
+                    placeholder="Sélectionnez une entreprise..." />
+                  <ComboboxTrigger class="absolute end-0 inset-y-0 flex items-center justify-center px-3">
+                    <ChevronsUpDown class="size-4 text-muted-foreground" />
+                  </ComboboxTrigger>
+                </div>
+              </ComboboxAnchor>
+              <ComboboxList>
+                <ComboboxEmpty>
+                  Aucune entreprise trouvée.
+                </ComboboxEmpty>
+                <ComboboxGroup>
+                  <ComboboxItem v-for="company in companies" :key="company.id" :value="company.id.toString()">
+                    {{ company.name }}
+                    <ComboboxItemIndicator>
+                      <Check :class="cn('ml-auto h-4 w-4')" />
+                    </ComboboxItemIndicator>
+                  </ComboboxItem>
+                </ComboboxGroup>
+              </ComboboxList>
+            </Combobox>
+          </div>
+          <div class="space-y-2">
+            <Label>Entreprise vendeuse</Label>
+            <Combobox by="label" v-model="sellerCompanyIdStr">
+              <ComboboxAnchor>
+                <div class="relative w-full items-center">
+                  <ComboboxInput
+                    :display-value="(val) => companies.find(c => c.id.toString() === val)?.name ?? ''"
+                    placeholder="Sélectionnez une entreprise..." />
+                  <ComboboxTrigger class="absolute end-0 inset-y-0 flex items-center justify-center px-3">
+                    <ChevronsUpDown class="size-4 text-muted-foreground" />
+                  </ComboboxTrigger>
+                </div>
+              </ComboboxAnchor>
+              <ComboboxList>
+                <ComboboxEmpty>
+                  Aucune entreprise trouvée.
+                </ComboboxEmpty>
+                <ComboboxGroup>
+                  <ComboboxItem v-for="company in companies" :key="company.id" :value="company.id.toString()">
+                    {{ company.name }}
+                    <ComboboxItemIndicator>
+                      <Check :class="cn('ml-auto h-4 w-4')" />
+                    </ComboboxItemIndicator>
+                  </ComboboxItem>
+                </ComboboxGroup>
+              </ComboboxList>
+            </Combobox>
+          </div>
+        </div>
+      </template>
 
-      <div>
-        <Label>Entreprise vendeuse</Label>
-        <Select
-          :model-value="selectedSellerCompanyId?.toString()"
-          @update:model-value="updateSellerCompanyId"
-          required
-        >
-          <option value="">Sélectionnez une entreprise</option>
-          <option v-for="company in companies" :key="company.id" :value="company.id.toString()">
-            {{ company.name }}
-          </option>
-        </Select>
-      </div>
-    </div>
-  </div>
+      <!-- B2B2C : Entreprise vendeuse + Contact acheteur -->
+      <template v-else-if="saleType === 'B2B2C'">
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <Label>Entreprise vendeuse</Label>
+            <Combobox by="label" v-model="sellerCompanyIdStr">
+              <ComboboxAnchor>
+                <div class="relative w-full items-center">
+                  <ComboboxInput
+                    :display-value="(val) => companies.find(c => c.id.toString() === val)?.name ?? ''"
+                    placeholder="Sélectionnez une entreprise..." />
+                  <ComboboxTrigger class="absolute end-0 inset-y-0 flex items-center justify-center px-3">
+                    <ChevronsUpDown class="size-4 text-muted-foreground" />
+                  </ComboboxTrigger>
+                </div>
+              </ComboboxAnchor>
+              <ComboboxList>
+                <ComboboxEmpty>
+                  Aucune entreprise trouvée.
+                </ComboboxEmpty>
+                <ComboboxGroup>
+                  <ComboboxItem v-for="company in companies" :key="company.id" :value="company.id.toString()">
+                    {{ company.name }}
+                    <ComboboxItemIndicator>
+                      <Check :class="cn('ml-auto h-4 w-4')" />
+                    </ComboboxItemIndicator>
+                  </ComboboxItem>
+                </ComboboxGroup>
+              </ComboboxList>
+            </Combobox>
+          </div>
+          <div class="space-y-2">
+            <Label>Contact acheteur</Label>
+            <Select v-model="contactIdStr">
+              <SelectTrigger>
+                <SelectValue :placeholder="'Sélectionnez un contact'" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem v-for="contact in contacts" :key="contact.id" :value="contact.id.toString()">
+                    {{ contact.name }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </template>
+
+      <!-- C2B2C : Contact vendeur + Contact acheteur -->
+      <template v-else-if="saleType === 'C2B2C'">
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <Label>Contact vendeur</Label>
+            <Select v-model="sellerContactIdStr">
+              <SelectTrigger>
+                <SelectValue :placeholder="'Sélectionnez un contact'" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem v-for="contact in contacts" :key="contact.id" :value="contact.id.toString()">
+                    {{ contact.name }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="space-y-2">
+            <Label>Contact acheteur</Label>
+            <Select v-model="contactIdStr">
+              <SelectTrigger>
+                <SelectValue :placeholder="'Sélectionnez un contact'" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem v-for="contact in contacts" :key="contact.id" :value="contact.id.toString()">
+                    {{ contact.name }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </template>
+
+      <!-- C2B2B : Contact vendeur + Entreprise acheteuse -->
+      <template v-else-if="saleType === 'C2B2B'">
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <Label>Contact vendeur</Label>
+            <Select v-model="sellerContactIdStr">
+              <SelectTrigger>
+                <SelectValue :placeholder="'Sélectionnez un contact'" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem v-for="contact in contacts" :key="contact.id" :value="contact.id.toString()">
+                    {{ contact.name }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="space-y-2">
+            <Label>Entreprise acheteuse</Label>
+            <Combobox by="label" v-model="buyerCompanyIdStr">
+              <ComboboxAnchor>
+                <div class="relative w-full items-center">
+                  <ComboboxInput
+                    :display-value="(val) => companies.find(c => c.id.toString() === val)?.name ?? ''"
+                    placeholder="Sélectionnez une entreprise..." />
+                  <ComboboxTrigger class="absolute end-0 inset-y-0 flex items-center justify-center px-3">
+                    <ChevronsUpDown class="size-4 text-muted-foreground" />
+                  </ComboboxTrigger>
+                </div>
+              </ComboboxAnchor>
+              <ComboboxList>
+                <ComboboxEmpty>
+                  Aucune entreprise trouvée.
+                </ComboboxEmpty>
+                <ComboboxGroup>
+                  <ComboboxItem v-for="company in companies" :key="company.id" :value="company.id.toString()">
+                    {{ company.name }}
+                    <ComboboxItemIndicator>
+                      <Check :class="cn('ml-auto h-4 w-4')" />
+                    </ComboboxItemIndicator>
+                  </ComboboxItem>
+                </ComboboxGroup>
+              </ComboboxList>
+            </Combobox>
+          </div>
+        </div>
+      </template>
+    </CardContent>
+  </Card>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import type { SaleType } from '../types'
-import { useReferenceStore } from '../stores/useReferenceStore'
-import { Select, Label } from '#components'
+import { computed } from 'vue'
+import { Check, ChevronsUpDown } from 'lucide-vue-next'
+import { cn } from '@/utils'
+import { 
+  Card, 
+  CardHeader, 
+  CardTitle, 
+  CardContent, 
+  Label, 
+  Select, 
+  SelectContent, 
+  SelectGroup, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue,
+  Combobox,
+  ComboboxAnchor,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxItemIndicator,
+  ComboboxList,
+  ComboboxTrigger
+} from '#components'
+import type { SaleType, Contact, Company } from '../types'
 
 const props = defineProps<{
   saleType: SaleType
   contactId?: number
   buyerCompanyId?: number
   sellerCompanyId?: number
+  sellerContactId?: number
+  contacts: Contact[]
+  companies: Company[]
 }>()
 
 const emit = defineEmits<{
   (e: 'update:contactId', value: number | undefined): void
   (e: 'update:buyerCompanyId', value: number | undefined): void
   (e: 'update:sellerCompanyId', value: number | undefined): void
+  (e: 'update:sellerContactId', value: number | undefined): void
 }>()
 
-const store = useReferenceStore()
-
-const selectedContactId = computed(() => props.contactId)
-const selectedBuyerCompanyId = computed(() => props.buyerCompanyId)
-const selectedSellerCompanyId = computed(() => props.sellerCompanyId)
-
-const updateContactId = (value: string) => {
-  emit('update:contactId', value ? Number(value) : undefined)
-}
-
-const updateBuyerCompanyId = (value: string) => {
-  emit('update:buyerCompanyId', value ? Number(value) : undefined)
-}
-
-const updateSellerCompanyId = (value: string) => {
-  emit('update:sellerCompanyId', value ? Number(value) : undefined)
-}
-
-const contacts = computed(() => store.contacts)
-const companies = computed(() => store.companies)
-
-// Réinitialiser les valeurs lors du changement de type de vente
-watch(() => props.saleType, () => {
-  if (props.saleType === 'B2C') {
-    emit('update:buyerCompanyId', undefined)
-    emit('update:sellerCompanyId', undefined)
-  } else {
-    emit('update:contactId', undefined)
-    if (props.saleType === 'B2B') {
-      emit('update:sellerCompanyId', undefined)
-    }
+// Titre dynamique selon le type de vente
+const getPartyTitle = computed(() => {
+  switch (props.saleType) {
+    case 'B2C':
+      return 'Contact'
+    case 'B2B':
+      return 'Entreprise'
+    case 'B2B2B':
+      return 'Entreprises'
+    case 'B2B2C':
+      return 'Entreprise vendeuse et Contact acheteur'
+    case 'C2B2C':
+      return 'Contacts vendeur et acheteur'
+    case 'C2B2B':
+      return 'Contact vendeur et Entreprise acheteuse'
+    default:
+      return 'Parties impliquées'
   }
 })
 
-onMounted(async () => {
-  await Promise.all([
-    store.fetchContacts(),
-    store.fetchCompanies()
-  ])
+// Conversion des IDs en string pour les composants de sélection
+const contactIdStr = computed({
+  get: () => props.contactId?.toString() || '',
+  set: (value: string) => {
+    emit('update:contactId', value ? Number(value) : undefined)
+  }
+})
+
+const buyerCompanyIdStr = computed({
+  get: () => props.buyerCompanyId?.toString() || '',
+  set: (value: string) => {
+    emit('update:buyerCompanyId', value ? Number(value) : undefined)
+  }
+})
+
+const sellerCompanyIdStr = computed({
+  get: () => props.sellerCompanyId?.toString() || '',
+  set: (value: string) => {
+    emit('update:sellerCompanyId', value ? Number(value) : undefined)
+  }
+})
+
+const sellerContactIdStr = computed({
+  get: () => props.sellerContactId?.toString() || '',
+  set: (value: string) => {
+    emit('update:sellerContactId', value ? Number(value) : undefined)
+  }
 })
 </script> 
