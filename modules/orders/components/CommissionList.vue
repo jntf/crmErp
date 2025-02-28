@@ -78,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from '#imports'
+import { ref, computed, watch, nextTick } from '#imports'
 import { PlusIcon, Trash2Icon } from 'lucide-vue-next'
 import { formatCurrency } from '~/utils/formatter'
 import { useCommissionStore } from '@/stores/useCommissionStore'
@@ -93,6 +93,7 @@ import {
   Badge,
   Separator
 } from '#components'
+import type { VehicleCommission } from '../types'
 
 interface Vehicle {
   id: number
@@ -109,20 +110,6 @@ interface OrderItem {
 interface Recipient {
   id: number
   name: string
-}
-
-interface VehicleCommission {
-  id: number
-  recipient_type: 'owner' | 'contact' | 'company'
-  recipient_id: number
-  order_item_id: number | null
-  amount: number
-  recipient?: Recipient
-  order_item?: {
-    id: number
-    vehicle_id?: number
-    vehicle?: Vehicle
-  }
 }
 
 const props = defineProps<{
@@ -145,47 +132,47 @@ const totalCommissions = computed(() =>
   props.modelValue.reduce((sum, commission) => sum + commission.amount, 0)
 )
 
-interface CommissionGroup {
-  recipientKey: string
-  recipientType: VehicleCommission['recipient_type']
-  recipientId: number
-  recipientName: string
-  commissions: VehicleCommission[]
-  total: number
-}
-
-// Dans la partie script, ajouter le computed pour grouper les commissions
+// Computed pour les commissions groupées par bénéficiaire
 const groupedCommissions = computed(() => {
-  const groups = props.modelValue.reduce((acc, commission) => {
-    const recipientKey = `${commission.recipient_type}-${commission.recipient_id}`
-    if (!acc[recipientKey]) {
-      acc[recipientKey] = {
-        recipientKey,
-        recipientType: commission.recipient_type,
-        recipientId: commission.recipient_id,
-        recipientName: getRecipientName(commission),
-        commissions: [],
-        total: 0
-      }
+  // Grouper les commissions par type et ID de bénéficiaire
+  const groups: Record<string, VehicleCommission[]> = {}
+  
+  props.modelValue.forEach(commission => {
+    const key = `${commission.recipient_type}-${commission.recipient_id}`
+    if (!groups[key]) {
+      groups[key] = []
     }
-    acc[recipientKey].commissions.push(commission)
-    acc[recipientKey].total += commission.amount
-    return acc
-  }, {} as Record<string, CommissionGroup>)
-
-  return Object.values(groups)
+    groups[key].push(commission)
+  })
+  
+  // Convertir en tableau pour l'affichage
+  const result = Object.entries(groups).map(([key, commissions]) => {
+    const [recipientType, recipientId] = key.split('-')
+    const total = commissions.reduce((sum, c) => sum + c.amount, 0)
+    
+    return {
+      recipientKey: key,
+      recipientType: recipientType as VehicleCommission['recipient_type'],
+      recipientId: Number(recipientId),
+      recipientName: getRecipientName(recipientType as VehicleCommission['recipient_type'], Number(recipientId)),
+      commissions,
+      total
+    }
+  })
+  
+  return result
 })
 
 // Fonction pour obtenir le nom du destinataire
-const getRecipientName = (commission: VehicleCommission) => {
-  switch (commission.recipient_type) {
+const getRecipientName = (recipientType: VehicleCommission['recipient_type'], recipientId: number) => {
+  switch (recipientType) {
     case 'owner':
       return 'Ma société'
     case 'contact':
-      const contact = props.contacts.find(c => c.id === commission.recipient_id)
+      const contact = props.contacts.find(c => c.id === recipientId)
       return contact?.name || ''
     case 'company':
-      const company = props.companies.find(c => c.id === commission.recipient_id)
+      const company = props.companies.find(c => c.id === recipientId)
       return company?.name || ''
     default:
       return ''
@@ -196,10 +183,39 @@ const getRecipientName = (commission: VehicleCommission) => {
 const getVehicleReference = (orderItemId: number | null, index: number) => {
   if (orderItemId === null || orderItemId === undefined) return 'Référence introuvable'
   
-  // Si order_item_id vaut 0, on utilise l'index pour retrouver le bon véhicule
-  if (orderItemId === 0 && props.orderItems.length > 0) {
-    const orderItemIndex = index % props.orderItems.length
-    return props.orderItems[orderItemIndex]?.vehicle?.internal_id || 'Référence introuvable'
+  // Si order_item_id vaut 0, on cherche d'abord par vehicleId
+  if (orderItemId === 0) {
+    // Récupérer la commission correspondante
+    const commission = props.modelValue[index]
+    if (commission?.vehicleId) {
+      // Chercher l'article par vehicleId
+      const matchingItem = props.orderItems.find(item => {
+        // Comparer les vehicleId en tenant compte des différents formats possibles
+        if (typeof commission.vehicleId === 'string' && typeof item.vehicle?.id === 'string') {
+          // Si les deux sont des chaînes, comparaison directe
+          return commission.vehicleId === item.vehicle.id;
+        } else if (typeof commission.vehicleId === 'number' && typeof item.vehicle?.id === 'number') {
+          // Si les deux sont des nombres, comparaison directe
+          return commission.vehicleId === item.vehicle.id;
+        } else if (commission.vehicleUuid && typeof item.vehicle?.id === 'string') {
+          // Si on a un UUID stocké séparément, l'utiliser pour la comparaison
+          return commission.vehicleUuid === item.vehicle.id;
+        }
+        
+        // Fallback: convertir en chaînes pour la comparaison
+        return String(commission.vehicleId) === String(item.vehicle?.id);
+      });
+      
+      if (matchingItem?.vehicle?.internal_id) {
+        return matchingItem.vehicle.internal_id
+      }
+    }
+    
+    // Fallback: utiliser l'index pour trouver un article
+    if (props.orderItems.length > 0) {
+      const orderItemIndex = index % props.orderItems.length
+      return props.orderItems[orderItemIndex]?.vehicle?.internal_id || 'Référence introuvable'
+    }
   }
   
   // Recherche par ID d'article
@@ -228,15 +244,75 @@ const openAddCommissionDialog = () => {
 
 const handleAddCommission = (commission: VehicleCommission | VehicleCommission[]) => {
   const newCommissions = Array.isArray(commission) ? commission : [commission]
-  const commissions = [...props.modelValue, ...newCommissions]
+  
+  // Vérifier que chaque commission a un ID et un vehicleId
+  const validatedCommissions = newCommissions.map(comm => {
+    if (!comm.id) {
+      return { ...comm, id: Math.floor(Math.random() * -1000) }
+    }
+    
+    // Vérifier que vehicleId est valide (peut être un UUID ou un nombre)
+    const hasValidVehicleId = comm.vehicleId !== null && comm.vehicleId !== undefined;
+    
+    if (!hasValidVehicleId) {
+      // Essayer de trouver un vehicleId via order_item_id
+      if (comm.order_item_id) {
+        const matchingItem = props.orderItems.find(item => item.id === comm.order_item_id);
+        if (matchingItem?.vehicle?.id) {
+          return { 
+            ...comm, 
+            vehicleId: matchingItem.vehicle.id,
+            vehicleUuid: typeof matchingItem.vehicle.id === 'string' ? matchingItem.vehicle.id : null
+          };
+        }
+      }
+    }
+    
+    return comm
+  })
+  
+  // Filtrer les commissions sans vehicleId valide
+  const filteredCommissions = validatedCommissions.filter(comm => {
+    const hasValidVehicleId = comm.vehicleId !== null && comm.vehicleId !== undefined;
+    
+    if (!hasValidVehicleId) {
+      return false;
+    }
+    
+    return true;
+  });
+  
+  if (filteredCommissions.length === 0) {
+    toast.error('Impossible d\'ajouter des commissions: données invalides');
+    return;
+  }
+  
+  const commissions = [...props.modelValue, ...filteredCommissions]
+  
   emit('update:modelValue', commissions)
   showAddCommissionDialog.value = false
+  
+  // Forcer une mise à jour du composant
+  nextTick(() => {
+    // Mise à jour forcée
+  })
 }
 
 // Modifier la fonction removeCommission pour gérer la suppression d'un groupe
 const removeCommissionGroup = (commissionsToRemove: VehicleCommission[]) => {
-  const orderItemIds = commissionsToRemove.map(c => c.order_item_id)
-  const commissions = props.modelValue.filter(c => !orderItemIds.includes(c.order_item_id))
+  // Créer un identifiant unique pour chaque commission (combinaison de order_item_id et vehicleId)
+  const getCommissionKey = (commission: VehicleCommission) => {
+    return `${commission.order_item_id}-${commission.vehicleId || 'null'}`
+  }
+  
+  // Créer un ensemble de clés à supprimer
+  const keysToRemove = new Set(commissionsToRemove.map(getCommissionKey))
+  
+  // Filtrer les commissions qui ne sont pas dans l'ensemble à supprimer
+  const commissions = props.modelValue.filter(commission => 
+    !keysToRemove.has(getCommissionKey(commission))
+  )
+  
   emit('update:modelValue', commissions)
 }
 </script> 

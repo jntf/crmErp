@@ -58,7 +58,7 @@ export interface Company {
  */
 export interface Vehicle {
   /** Identifiant unique du véhicule */
-  id: number
+  id: number | string
   /** Référence interne du véhicule */
   internal_id: string
   /** Marque du véhicule */
@@ -100,7 +100,7 @@ export interface OrderItem {
   /** Identifiant de la commande parente */
   orderId: number
   /** Identifiant du véhicule associé */
-  vehicleId: string
+  vehicleId: string | number
   /** Référence interne du véhicule */
   vehicleInternalId: string
   /** Quantité commandée */
@@ -142,6 +142,10 @@ export interface VehicleCommission {
   id: number
   /** Identifiant de l'article de commande associé */
   order_item_id: number
+  /** Identifiant du véhicule associé (pour traçabilité avant création de l'article) */
+  vehicleId: number | string
+  /** Identifiant UUID du véhicule (si format UUID utilisé) */
+  vehicleUuid?: string | null
   /** Identifiant du type de commission */
   commission_type_id: number
   /** Montant de la commission */
@@ -155,14 +159,14 @@ export interface VehicleCommission {
   /** Métadonnées additionnelles */
   metadata: Record<string, any>
   /** Date de création */
-  created_at: string
+  created_at?: string
   /** Date de dernière modification */
-  updated_at: string
+  updated_at?: string
   /** Article de commande associé (relation) */
   order_item?: {
     id: number
     vehicle?: {
-      id: number
+      id: number | string
       internal_id: string
       model: string
       vin: string

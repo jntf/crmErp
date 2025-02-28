@@ -137,7 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { PlusIcon, Trash2Icon } from 'lucide-vue-next'
 import { formatCurrency } from '~/utils/formatter'
 import type { OrderItem, Vehicle } from '../types'
@@ -208,17 +208,23 @@ const addVehicles = (selectedVehicles: Vehicle[]) => {
   const items = [...props.modelValue]
 
   selectedVehicles.forEach(vehicle => {
-    if (!items.some(item => item.vehicleId === vehicle.id)) {
+    // Convertir les IDs en string pour la comparaison
+    const vehicleIdStr = String(vehicle.id);
+    if (!items.some(item => String(item.vehicleId) === vehicleIdStr)) {
+      // Déterminer les prix en fonction du type
+      const purchasePriceHt = vehicle.vehicle_prices?.purchase_price_ht || 0;
+      const sellingPriceHt = vehicle.vehicle_prices?.selling_price_ht || 0;
+      
       items.push({
         id: 0,
         orderId: 0,
-        vehicleId: vehicle.id.toString(),
+        vehicleId: vehicle.id, // Conserver le format d'origine (UUID ou nombre)
         vehicleInternalId: vehicle.internal_id,
         quantity: 1,
         stockType: 'existing', // Par défaut, utiliser le stock existant
-        purchasePriceHt: vehicle.vehicle_prices?.purchase_price_ht || 0,
-        unitPriceHt: vehicle.vehicle_prices?.selling_price_ht || 0,
-        sellingPriceHt: vehicle.vehicle_prices?.selling_price_ht || 0,
+        purchasePriceHt: purchasePriceHt,
+        unitPriceHt: sellingPriceHt,
+        sellingPriceHt: sellingPriceHt,
         tvaRate: 20,
         totalHt: 0,
         totalTva: 0,
@@ -226,7 +232,11 @@ const addVehicles = (selectedVehicles: Vehicle[]) => {
         isPaid: false,
         status: 'DRAFT',
         isDelivered: false,
-        vehicle
+        vehicle: {
+          ...vehicle,
+          // Conserver l'ID du véhicule dans son format d'origine
+          id: vehicle.id
+        }
       })
     }
   })
@@ -235,7 +245,7 @@ const addVehicles = (selectedVehicles: Vehicle[]) => {
 }
 
 const getMaxQuantityAvailable = (vehicleId: string) => {
-  const vehicle = props.vehicles.find(v => v.id.toString() === vehicleId)
+  const vehicle = props.vehicles.find(v => String(v.id) === vehicleId)
   return vehicle?.qty || 1
 }
 </script> 

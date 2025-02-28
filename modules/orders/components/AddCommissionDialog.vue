@@ -362,70 +362,94 @@ const calculateAmount = () => {
   }
 }
 
-// Soumission du formulaire avec validation des règles de l'owner
+// Fonction pour soumettre le formulaire
 const handleSubmit = () => {
-  if (!isValid.value) {
-    // Message d'erreur plus précis selon la règle non respectée
-    if (ownerSettings.value) {
-      const settings = ownerSettings.value.settings
-      if (settings.hasMinAmount && form.value.amount < settings.minAmount) {
-        toast.error(`Le montant minimum de la commission doit être de ${formatCurrency(settings.minAmount)}`)
-        return
-      }
-      if (settings.hasMaxAmount && form.value.amount > settings.maxAmount) {
-        toast.error(`Le montant maximum de la commission ne peut pas dépasser ${formatCurrency(settings.maxAmount)}`)
-        return
-      }
-    }
-    toast.error('Veuillez remplir tous les champs requis')
+  if (!form.value.commission_type_id || !form.value.recipientType || !form.value.recipientId) {
     return
   }
 
-  if (form.value.applyToAll) {
-    const commissions = props.orderItems.map(item => ({
-      order_item_id: item.id,
-      commission_type_id: form.value.commission_type_id,
-      rate: form.value.rate,
-      amount: form.value.amount,
-      recipient_type: form.value.recipientType,
-      recipient_id: form.value.recipientId
-    }))
-    emit('add', commissions)
-  } else {
-    const commission = {
-      order_item_id: form.value.order_item_id,
-      commission_type_id: form.value.commission_type_id,
-      rate: form.value.rate,
-      amount: form.value.amount,
-      recipient_type: form.value.recipientType,
-      recipient_id: form.value.recipientId
+  // Validation du montant de la commission
+  const settings = currentCommissionSettings.value
+  if (settings) {
+    if (settings.hasMinAmount && form.value.amount < settings.minAmount) {
+      form.value.amount = settings.minAmount
     }
+    if (settings.hasMaxAmount && form.value.amount > settings.maxAmount) {
+      form.value.amount = settings.maxAmount
+    }
+  }
+
+  if (form.value.applyToAll) {
+    // Créer une commission pour chaque article
+    const commissions = props.orderItems.map(item => {
+      // Utiliser directement l'UUID du véhicule sans tenter de le convertir en nombre
+      const vehicleId = item.vehicle?.id;
+      
+      // Vérifier que l'article a un vehicleId valide (peut être un UUID ou un nombre)
+      const isValidVehicleId = vehicleId !== undefined && vehicleId !== null;
+      
+      if (!isValidVehicleId) {
+        // Aucun log ici
+      }
+      
+      const commission = {
+        id: Math.floor(Math.random() * -1000), // ID temporaire négatif pour les nouvelles commissions
+        order_item_id: item.id || 0,
+        vehicleId: vehicleId, // Conserver le format d'origine (UUID ou nombre)
+        vehicleUuid: typeof vehicleId === 'string' ? vehicleId : null, // Stocker l'UUID séparément si c'est une chaîne
+        commission_type_id: form.value.commission_type_id,
+        rate: form.value.rate,
+        amount: form.value.amount,
+        recipient_type: form.value.recipientType,
+        recipient_id: form.value.recipientId,
+        metadata: {}
+      }
+      return commission
+    })
+    
+    // Filtrer les commissions sans vehicleId valide
+    const validCommissions = commissions.filter(c => c.vehicleId !== null && c.vehicleId !== undefined)
+    if (validCommissions.length < commissions.length) {
+      if (validCommissions.length === 0) {
+        toast.error('Impossible de créer des commissions: aucun véhicule valide')
+        return
+      }
+    }
+    
+    emit('add', validCommissions)
+  } else {
+    // Créer une commission pour l'article sélectionné
+    const selectedItem = props.orderItems.find(item => item.id === form.value.order_item_id)
+    
+    // Utiliser directement l'UUID du véhicule sans tenter de le convertir en nombre
+    const vehicleId = selectedItem?.vehicle?.id;
+    
+    // Vérifier que l'article a un vehicleId valide (peut être un UUID ou un nombre)
+    const isValidVehicleId = vehicleId !== undefined && vehicleId !== null;
+    
+    if (!isValidVehicleId) {
+      toast.error('Impossible de créer la commission: véhicule non défini ou invalide')
+      return
+    }
+    
+    const commission = {
+      id: Math.floor(Math.random() * -1000), // ID temporaire négatif pour les nouvelles commissions
+      order_item_id: form.value.order_item_id || 0,
+      vehicleId: vehicleId, // Conserver le format d'origine (UUID ou nombre)
+      vehicleUuid: typeof vehicleId === 'string' ? vehicleId : null, // Stocker l'UUID séparément si c'est une chaîne
+      commission_type_id: form.value.commission_type_id,
+      rate: form.value.rate,
+      amount: form.value.amount,
+      recipient_type: form.value.recipientType,
+      recipient_id: form.value.recipientId,
+      metadata: {}
+    }
+    
     emit('add', commission)
   }
 
   emit('update:open', false)
   resetForm()
-}
-
-// Fonction utilitaire pour calculer le montant de la commission pour un véhicule
-const calculateCommissionAmount = (baseAmount: number) => {
-  const settings = currentCommissionSettings.value
-  if (!settings) return 0
-
-  if (settings.calculationType === 'fixed_amount') {
-    return settings.fixedAmount
-  }
-
-  let amount = baseAmount * (form.value.rate / 100)
-  
-  if (settings.hasMinAmount && amount < settings.minAmount) {
-    return settings.minAmount
-  }
-  if (settings.hasMaxAmount && amount > settings.maxAmount) {
-    return settings.maxAmount
-  }
-  
-  return amount
 }
 
 // Réinitialisation du formulaire

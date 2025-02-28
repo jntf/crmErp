@@ -9,7 +9,7 @@
  */
 
 import { computed } from 'vue'
-import type { SaleType, OrderFormData } from '../types'
+import type { SaleType, OrderFormData, OrderItem, VehicleCommission } from '../types'
 
 export function useOrderIntermediation() {
   /**
@@ -65,7 +65,7 @@ export function useOrderIntermediation() {
   /**
    * Prépare les données de commande pour l'intermédiation
    */
-  const prepareIntermediationData = (formData: OrderFormData) => {
+  const prepareIntermediationOrderData = (formData: OrderFormData) => {
     const type = formData.saleType
     const parties = getIntermediationParties(type)
     
@@ -94,7 +94,7 @@ export function useOrderIntermediation() {
    * Calcule le taux de TVA applicable selon les règles d'intermédiation
    * Basé sur le diagramme de calcul de TVA fourni
    */
-  const calculateIntermediationTVA = (
+  const calculateIntermediationVat = (
     type: SaleType,
     buyerCountry: string,
     sellerCountry: string,
@@ -134,11 +134,50 @@ export function useOrderIntermediation() {
     }
   }
   
+  /**
+   * Associe les commissions aux articles de commande en utilisant le vehicleId
+   * Cette fonction est utile lors de la préparation des données pour la sauvegarde
+   * 
+   * @param items - Les articles de commande
+   * @param commissions - Les commissions à associer
+   * @returns Les commissions avec les order_item_id corrects
+   */
+  const associateCommissionsWithItems = (
+    items: OrderItem[],
+    commissions: VehicleCommission[]
+  ): VehicleCommission[] => {
+    return commissions.map(commission => {
+      // Si la commission a déjà un order_item_id valide (différent de 0), on le conserve
+      if (commission.order_item_id && commission.order_item_id !== 0) {
+        return commission
+      }
+      
+      // Sinon, on essaie de trouver l'article correspondant au vehicleId
+      if (commission.vehicleId) {
+        const matchingItem = items.find(item => 
+          item.vehicleId === commission.vehicleId?.toString() || 
+          Number(item.vehicleId) === commission.vehicleId
+        )
+        
+        if (matchingItem) {
+          return {
+            ...commission,
+            order_item_id: matchingItem.id
+          }
+        }
+      }
+      
+      // Si on n'a pas pu associer la commission, on retourne la commission inchangée
+      return commission
+    })
+  }
+
   return {
     isIntermediationType,
     getIntermediationParties,
     validateIntermediationParties,
-    prepareIntermediationData,
-    calculateIntermediationTVA
+    prepareIntermediationOrderData,
+    calculateIntermediationVat,
+    associateCommissionsWithItems
   }
 } 

@@ -106,12 +106,12 @@
             :order-items="form.items.map(item => ({
               id: item.id,
               vehicle: item.vehicle ? {
-                id: Number(item.vehicleId),
+                id: item.vehicle.id,
                 internal_id: item.vehicleInternalId,
                 model: item.vehicle.model,
                 vin: item.vehicle.vin || ''
               } : undefined
-            }))" 
+            })) as any" 
             :contacts="contacts" 
             :companies="companies" 
             :owner-id="currentOwnerId" 
@@ -126,7 +126,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeftIcon, DownloadIcon } from 'lucide-vue-next'
 import { useOrderStore } from '@/modules/orders/stores/useOrderStore'
@@ -165,7 +165,7 @@ const router = useRouter()
 const store = useOrderStore()
 const ownerStore = useOwnerStore()
 const commissionStore = useCommissionStore()
-const { isIntermediationType } = useOrderIntermediation()
+const { isIntermediationType, associateCommissionsWithItems } = useOrderIntermediation()
 
 // Récupérer le type de vente depuis la query si nouvelle commande
 const saleTypeFromQuery = computed(() => route.query.type as SaleType | undefined)
@@ -271,26 +271,103 @@ interface CreateOrderResponse {
 const saveOrder = async () => {
   saving.value = true
   try {
-    console.log('----------- DÉBUT CRÉATION COMMANDE SIMPLIFIÉE -----------')
+    console.log('----------- DONNÉES COMPLÈTES DE LA COMMANDE -----------')
     console.log('TYPE DE VENTE:', form.value.saleType)
-    console.log('DONNÉES DU FORMULAIRE:', form.value)
+    console.log('DONNÉES DU FORMULAIRE:', JSON.stringify(form.value, null, 2))
     
-    // Version simplifiée qui retourne un succès fictif
+    // Afficher les informations spécifiques selon le type de vente
+    if (isIntermediationType(form.value.saleType)) {
+      console.log('----------- INFORMATIONS D\'INTERMÉDIATION -----------')
+      console.log('Type d\'intermédiation:', form.value.saleType)
+      
+      // Afficher les parties impliquées selon le type
+      if (form.value.saleType === 'B2B2B') {
+        console.log('Entreprise vendeuse (intermédiaire):', form.value.sellerCompanyId)
+        console.log('Entreprise acheteuse:', form.value.buyerCompanyId)
+      } else if (form.value.saleType === 'B2B2C') {
+        console.log('Entreprise vendeuse (intermédiaire):', form.value.sellerCompanyId)
+        console.log('Contact acheteur:', form.value.contactId)
+      } else if (form.value.saleType === 'C2B2C') {
+        console.log('Contact vendeur:', form.value.sellerContactId)
+        console.log('Contact acheteur:', form.value.contactId)
+      } else if (form.value.saleType === 'C2B2B') {
+        console.log('Contact vendeur:', form.value.sellerContactId)
+        console.log('Entreprise acheteuse:', form.value.buyerCompanyId)
+      }
+      
+      // Afficher les métadonnées
+      console.log('Métadonnées:', form.value.metadata)
+    } else {
+      console.log('----------- INFORMATIONS DE VENTE DIRECTE -----------')
+      if (form.value.saleType === 'B2C') {
+        console.log('Contact acheteur:', form.value.contactId)
+      } else if (form.value.saleType === 'B2B') {
+        console.log('Entreprise acheteuse:', form.value.buyerCompanyId)
+      }
+    }
+    
+    // Afficher les articles et commissions
+    console.log('----------- ARTICLES -----------')
+    console.log('Nombre d\'articles:', form.value.items.length)
+    form.value.items.forEach((item, index) => {
+      console.log(`Article ${index + 1}:`, {
+        vehicleId: item.vehicleId,
+        vehicleInternalId: item.vehicleInternalId,
+        sellingPriceHt: item.sellingPriceHt,
+        quantity: item.quantity
+      })
+    })
+    
+    // Associer les commissions aux articles en utilisant le vehicleId
+    const associatedCommissions = associateCommissionsWithItems(form.value.items, form.value.commissions)
+    
+    console.log('----------- COMMISSIONS -----------')
+    console.log('Nombre de commissions:', associatedCommissions.length)
+    associatedCommissions.forEach((commission, index) => {
+      console.log(`Commission ${index + 1}:`, {
+        order_item_id: commission.order_item_id,
+        vehicleId: commission.vehicleId,
+        recipient_type: commission.recipient_type,
+        recipient_id: commission.recipient_id,
+        amount: commission.amount,
+        commission_type_id: commission.commission_type_id
+      })
+      
+      // Vérifier si on peut associer la commission à un article via le vehicleId
+      if (commission.vehicleId) {
+        const matchingItem = form.value.items.find(item => 
+          item.vehicleId === commission.vehicleId?.toString() || 
+          Number(item.vehicleId) === commission.vehicleId
+        )
+        if (matchingItem) {
+          console.log(`  → Commission associée au véhicule: ${matchingItem.vehicleInternalId}`)
+        } else {
+          console.log(`  → Impossible de trouver un article correspondant au vehicleId: ${commission.vehicleId}`)
+        }
+      } else if (commission.order_item_id === 0) {
+        console.log(`  → Commission avec order_item_id = 0 sans vehicleId associé`)
+      }
+    })
+    
+    console.log('----------- TOTAUX -----------')
+    console.log('Total HT:', form.value.totalHt)
+    console.log('Total TVA:', form.value.totalTva)
+    console.log('Total TTC:', form.value.totalTtc)
+    
+    // Version simplifiée qui retourne un succès fictif sans sauvegarder
     const result = {
       success: true,
       orderId: 999,
       orderNumber: 'CMD-TEMP-' + Date.now(),
-      message: 'Commande créée avec succès (simulation)'
+      message: 'Commande affichée dans la console (aucune sauvegarde effectuée)'
     }
     
-    console.log('----------- RÉSULTAT SIMULÉ -----------')
-    console.log('✅ CRÉATION SIMULÉE')
-    console.log('ID:', result.orderId)
-    console.log('NUMÉRO:', result.orderNumber)
+    console.log('----------- SIMULATION TERMINÉE -----------')
+    console.log('✅ AUCUNE SAUVEGARDE EFFECTUÉE - Vérifiez la console pour les détails')
     
-    router.push('/orders')
+    // Commenter cette ligne pour ne pas rediriger et pouvoir voir la console
+    // router.push('/orders')
     
-    console.log('----------- FIN CRÉATION COMMANDE SIMPLIFIÉE -----------')
     return result
   } catch (error) {
     console.error('❌ ERREUR CRITIQUE:', error)
