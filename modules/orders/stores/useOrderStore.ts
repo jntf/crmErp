@@ -29,8 +29,8 @@ interface CreateOrderResponse {
 // Types de vente directs (B2B, B2C)
 const DIRECT_SALE_TYPES = ['B2B', 'B2C']
 
-// Types de vente avec intermédiation (B2B2B, P2P, P2B, B2P)
-const INTERMEDIATION_SALE_TYPES = ['B2B2B', 'P2P', 'P2B', 'B2P']
+// Types de vente avec intermédiation (B2B2B, B2B2C, C2B2C, C2B2B)
+const INTERMEDIATION_SALE_TYPES = ['B2B2B', 'B2B2C', 'C2B2C', 'C2B2B']
 
 // Interface pour les données d'article de commande
 interface OrderItemData {
@@ -406,32 +406,40 @@ export const useOrderStore = defineStore('orders', {
     async createOrderWithFunction(orderData: Record<string, any>): Promise<CreateOrderResponse | null> {
       this.loading = true
       try {
-        console.log('Création de commande simplifiée:', orderData)
+        console.log('Création de commande avec fonction:', orderData)
         
-        // Simuler un délai pour donner l'impression que quelque chose se passe
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        // Retourner un succès fictif
-        const result = {
-          success: true,
-          orderId: 999,
-          orderNumber: 'CMD-TEMP-' + Date.now(),
-          message: 'Commande créée avec succès (simulation)',
-          logs: [
-            { message: 'Simulation de création de commande' },
-            { message: `Type de vente: ${orderData.saleType}` },
-            { message: `Nombre d'articles: ${orderData.items?.length || 0}` }
-          ]
+        // S'assurer que le type de vente est défini
+        if (!orderData.saleType) {
+          throw new Error('Le type de vente (saleType) est requis pour créer une commande');
         }
         
-        console.log('Résultat simulé:', result)
+        // Déterminer la fonction à appeler selon le type de vente
+        const functionName = this.getOrderFunctionName(orderData.saleType)
+        console.log(`Appel de la fonction Supabase: ${functionName}`)
+        
+        // Préparer les données
+        const preparedData = this.prepareOrderData(orderData)
+        
+        // Appel à la fonction Supabase appropriée
+        const supabase = useSupabaseClient()
+        const { data, error } = await supabase.rpc(
+          functionName,
+          { p_order_data: preparedData }
+        )
+        
+        if (error) {
+          console.error('Erreur Supabase:', error)
+          throw error
+        }
+        
+        console.log('Résultat de la création:', data)
         
         // Rafraîchir la liste des commandes pour maintenir la cohérence de l'UI
         await this.fetchOrders()
         
-        return result as CreateOrderResponse
+        return data as CreateOrderResponse
       } catch (error) {
-        console.error('Erreur simulée dans createOrderWithFunction:', error)
+        console.error('Erreur dans createOrderWithFunction:', error)
         this.error = (error as Error).message
         return {
           success: false,
@@ -442,16 +450,142 @@ export const useOrderStore = defineStore('orders', {
       }
     },
 
-    // Méthode simplifiée pour déterminer quelle fonction appeler selon le type de vente
+    // Méthode pour déterminer quelle fonction appeler selon le type de vente
     getOrderFunctionName(saleType: string): string {
-      console.log('Détermination de la fonction à utiliser (version simplifiée):', saleType)
-      return 'create_order_simplified'
+      if (!saleType) {
+        console.error('Type de vente non défini');
+        return 'create_order_direct'; // Valeur par défaut
+      }
+
+      // Vérifier si c'est un type d'intermédiation
+      if (INTERMEDIATION_SALE_TYPES.includes(saleType)) {
+        return 'create_order_intermediation';
+      }
+      
+      // Ventes directes
+      if (DIRECT_SALE_TYPES.includes(saleType)) {
+        return 'create_order_direct';
+      }
+      
+      // Cas par défaut (pour rétrocompatibilité ou nouveaux types)
+      console.warn(`Type de vente non reconnu: ${saleType}, utilisation de la fonction par défaut`);
+      return 'create_order_direct';
     },
 
     // Méthode simplifiée pour préparer les données selon le type de vente
     prepareOrderData(orderData: Record<string, any>): Record<string, any> {
-      console.log('Préparation des données de commande (version simplifiée):', orderData.saleType)
-      return orderData
+      const { saleType } = orderData;
+      const result = { ...orderData };
+      
+      // Ventes d'intermédiation
+      if (['B2B2B', 'B2B2C', 'C2B2C', 'C2B2B'].includes(saleType)) {
+        // Ajouter les métadonnées spécifiques à l'intermédiation
+        result.metadata = {
+          ...result.metadata,
+          intermediation_type: saleType,
+          commission_payer: result.metadata?.commission_payer || 'seller'
+        };
+        
+        // Gérer les cas spécifiques par type d'intermédiation
+        switch (saleType) {
+          case 'B2B2B':
+            // Vérifier les IDs des entreprises
+            if (!result.buyerCompanyId || !result.sellerCompanyId) {
+              console.error('B2B2B nécessite buyerCompanyId et sellerCompanyId');
+            }
+            break;
+            
+          case 'B2B2C':
+            // Vérifier ID entreprise vendeuse et contact acheteur
+            if (!result.sellerCompanyId || !result.contactId) {
+              console.error('B2B2C nécessite sellerCompanyId et contactId');
+            }
+            break;
+            
+          case 'C2B2C':
+            // Vérifier les IDs des contacts
+            if (!result.contactId || !result.sellerContactId) {
+              console.error('C2B2C nécessite contactId et sellerContactId');
+            }
+            // Stocker le contact vendeur dans les métadonnées
+            result.metadata.seller_contact_id = result.sellerContactId;
+            break;
+            
+          case 'C2B2B':
+            // Vérifier ID contact vendeur et entreprise acheteuse
+            if (!result.sellerContactId || !result.buyerCompanyId) {
+              console.error('C2B2B nécessite sellerContactId et buyerCompanyId');
+            }
+            // Stocker le contact vendeur dans les métadonnées
+            result.metadata.seller_contact_id = result.sellerContactId;
+            break;
+        }
+        
+        // Préparer les commissions
+        if (result.commissions && result.commissions.length > 0) {
+          // Associer les commissions aux articles
+          result.commissions = this.associateCommissionsWithItems(result.items, result.commissions);
+        }
+      } 
+      // Ventes directes
+      else if (saleType === 'B2C') {
+        // Vérifier le contact acheteur
+        if (!result.contactId) {
+          console.error('B2C nécessite contactId');
+        }
+        // Supprimer les champs non pertinents
+        delete result.buyerCompanyId;
+        delete result.sellerCompanyId;
+        delete result.sellerContactId;
+      } 
+      else if (saleType === 'B2B') {
+        // Vérifier l'entreprise acheteuse
+        if (!result.buyerCompanyId) {
+          console.error('B2B nécessite buyerCompanyId');
+        }
+        // Supprimer les champs non pertinents
+        delete result.contactId;
+        delete result.sellerCompanyId;
+        delete result.sellerContactId;
+      }
+      
+      // Calculer les totaux finaux
+      result.totalHt = result.items.reduce((sum: number, item: any) => sum + item.totalHt, 0);
+      result.totalTva = result.items.reduce((sum: number, item: any) => sum + item.totalTva, 0);
+      result.totalTtc = result.totalHt + result.totalTva;
+      
+      return result;
+    },
+
+    // Méthode pour associer les commissions aux articles de commande
+    associateCommissionsWithItems(
+      items: OrderItem[], 
+      commissions: VehicleCommission[]
+    ): VehicleCommission[] {
+      return commissions.map(commission => {
+        // Si la commission a déjà un order_item_id valide, on le conserve
+        if (commission.order_item_id && commission.order_item_id !== 0) {
+          return commission;
+        }
+        
+        // Sinon, on cherche l'article correspondant au vehicleId
+        if (commission.vehicleId) {
+          const matchingItem = items.find(item => 
+            item.vehicleId === commission.vehicleId?.toString() || 
+            Number(item.vehicleId) === commission.vehicleId
+          );
+          
+          if (matchingItem) {
+            return {
+              ...commission,
+              order_item_id: matchingItem.id
+            };
+          }
+        }
+        
+        // Si on n'a pas pu associer la commission, on la laisse telle quelle
+        return commission;
+      });
     },
 
     // Méthode simplifiée pour préparer les articles

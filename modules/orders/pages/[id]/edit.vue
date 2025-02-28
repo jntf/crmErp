@@ -148,8 +148,6 @@ import OrderSummary from '../../components/OrderSummary.vue'
 import CommissionList from '../../components/CommissionList.vue'
 import SaleTypeSelector from '../../components/SaleTypeSelector.vue'
 import PartySelector from '../../components/PartySelector.vue'
-import { useOwnerStore } from '@/stores/useOwnerStore'
-import { useCommissionStore } from '@/stores/useCommissionStore'
 import {
   Card,
   CardHeader,
@@ -159,13 +157,18 @@ import {
   Textarea,
   Badge
 } from '#components'
+import { useOwnerStore } from '@/stores/useOwnerStore'
+import { useCommissionStore } from '@/stores/useCommissionStore'
 
 const route = useRoute()
 const router = useRouter()
 const store = useOrderStore()
-const ownerStore = useOwnerStore()
-const commissionStore = useCommissionStore()
-const { isIntermediationType, associateCommissionsWithItems } = useOrderIntermediation()
+const { 
+  isIntermediationType, 
+  validateIntermediationParties, 
+  prepareIntermediationOrderData, 
+  associateCommissionsWithItems 
+} = useOrderIntermediation()
 
 // Récupérer le type de vente depuis la query si nouvelle commande
 const saleTypeFromQuery = computed(() => route.query.type as SaleType | undefined)
@@ -219,6 +222,10 @@ const {
   fetchAllData: fetchReferences
 } = useReferenceData()
 
+// Restaurer les déclarations
+const ownerStore = useOwnerStore()
+const commissionStore = useCommissionStore()
+
 // Méthodes
 const fetchOrder = async () => {
   if (!orderId.value) {
@@ -271,112 +278,93 @@ interface CreateOrderResponse {
 const saveOrder = async () => {
   saving.value = true
   try {
-    console.log('----------- DONNÉES COMPLÈTES DE LA COMMANDE -----------')
-    console.log('TYPE DE VENTE:', form.value.saleType)
-    console.log('DONNÉES DU FORMULAIRE:', JSON.stringify(form.value, null, 2))
+    // 1. Déterminer le type de vente
+    const isIntermediation = isIntermediationType(form.value.saleType);
     
-    // Afficher les informations spécifiques selon le type de vente
-    if (isIntermediationType(form.value.saleType)) {
-      console.log('----------- INFORMATIONS D\'INTERMÉDIATION -----------')
-      console.log('Type d\'intermédiation:', form.value.saleType)
-      
-      // Afficher les parties impliquées selon le type
-      if (form.value.saleType === 'B2B2B') {
-        console.log('Entreprise vendeuse (intermédiaire):', form.value.sellerCompanyId)
-        console.log('Entreprise acheteuse:', form.value.buyerCompanyId)
-      } else if (form.value.saleType === 'B2B2C') {
-        console.log('Entreprise vendeuse (intermédiaire):', form.value.sellerCompanyId)
-        console.log('Contact acheteur:', form.value.contactId)
-      } else if (form.value.saleType === 'C2B2C') {
-        console.log('Contact vendeur:', form.value.sellerContactId)
-        console.log('Contact acheteur:', form.value.contactId)
-      } else if (form.value.saleType === 'C2B2B') {
-        console.log('Contact vendeur:', form.value.sellerContactId)
-        console.log('Entreprise acheteuse:', form.value.buyerCompanyId)
+    // 2. Validation spécifique selon le type
+    if (isIntermediation) {
+      // Validation pour l'intermédiation
+      const { isValid, errors } = validateIntermediationParties(form.value);
+      if (!isValid) {
+        throw new Error(`Validation de l'intermédiation échouée: ${errors.join(', ')}`);
       }
       
-      // Afficher les métadonnées
-      console.log('Métadonnées:', form.value.metadata)
+      // Vérifier que des commissions sont définies (obligatoire pour l'intermédiation)
+      if (!form.value.commissions || form.value.commissions.length === 0) {
+        throw new Error("Une vente d'intermédiation nécessite au moins une commission");
+      }
     } else {
-      console.log('----------- INFORMATIONS DE VENTE DIRECTE -----------')
-      if (form.value.saleType === 'B2C') {
-        console.log('Contact acheteur:', form.value.contactId)
-      } else if (form.value.saleType === 'B2B') {
-        console.log('Entreprise acheteuse:', form.value.buyerCompanyId)
+      // Validation pour vente directe
+      if (form.value.saleType === 'B2C' && !form.value.contactId) {
+        throw new Error("Un contact acheteur est requis pour une vente B2C");
+      } else if (form.value.saleType === 'B2B' && !form.value.buyerCompanyId) {
+        throw new Error("Une entreprise acheteuse est requise pour une vente B2B");
       }
     }
     
-    // Afficher les articles et commissions
-    console.log('----------- ARTICLES -----------')
-    console.log('Nombre d\'articles:', form.value.items.length)
-    form.value.items.forEach((item, index) => {
-      console.log(`Article ${index + 1}:`, {
-        vehicleId: item.vehicleId,
-        vehicleInternalId: item.vehicleInternalId,
-        sellingPriceHt: item.sellingPriceHt,
-        quantity: item.quantity
-      })
-    })
-    
-    // Associer les commissions aux articles en utilisant le vehicleId
-    const associatedCommissions = associateCommissionsWithItems(form.value.items, form.value.commissions)
-    
-    console.log('----------- COMMISSIONS -----------')
-    console.log('Nombre de commissions:', associatedCommissions.length)
-    associatedCommissions.forEach((commission, index) => {
-      console.log(`Commission ${index + 1}:`, {
-        order_item_id: commission.order_item_id,
-        vehicleId: commission.vehicleId,
-        recipient_type: commission.recipient_type,
-        recipient_id: commission.recipient_id,
-        amount: commission.amount,
-        commission_type_id: commission.commission_type_id
-      })
+    // 3. Préparation des données spécifique au type
+    let orderData;
+    if (isIntermediation) {
+      // Préparation des données pour l'intermédiation
+      orderData = prepareIntermediationOrderData(form.value);
       
-      // Vérifier si on peut associer la commission à un article via le vehicleId
-      if (commission.vehicleId) {
-        const matchingItem = form.value.items.find(item => 
-          item.vehicleId === commission.vehicleId?.toString() || 
-          Number(item.vehicleId) === commission.vehicleId
-        )
-        if (matchingItem) {
-          console.log(`  → Commission associée au véhicule: ${matchingItem.vehicleInternalId}`)
-        } else {
-          console.log(`  → Impossible de trouver un article correspondant au vehicleId: ${commission.vehicleId}`)
-        }
-      } else if (commission.order_item_id === 0) {
-        console.log(`  → Commission avec order_item_id = 0 sans vehicleId associé`)
-      }
-    })
-    
-    console.log('----------- TOTAUX -----------')
-    console.log('Total HT:', form.value.totalHt)
-    console.log('Total TVA:', form.value.totalTva)
-    console.log('Total TTC:', form.value.totalTtc)
-    
-    // Version simplifiée qui retourne un succès fictif sans sauvegarder
-    const result = {
-      success: true,
-      orderId: 999,
-      orderNumber: 'CMD-TEMP-' + Date.now(),
-      message: 'Commande affichée dans la console (aucune sauvegarde effectuée)'
+      // Associer correctement les commissions aux articles
+      orderData.commissions = associateCommissionsWithItems(
+        form.value.items, 
+        form.value.commissions
+      );
+      
+      // Ajouter des métadonnées spécifiques à l'intermédiation
+      orderData.metadata = {
+        ...orderData.metadata,
+        intermediation_type: form.value.saleType,
+        // Qui paie la commission (vendeur par défaut)
+        commission_payer: orderData.metadata?.commission_payer || 'seller'
+      };
+    } else {
+      // Préparation des données pour vente directe
+      orderData = {
+        ...form.value,
+        // Dans une vente directe, pas besoin de seller_company_id pour B2C ou B2B
+        sellerCompanyId: null,
+        sellerContactId: null,
+        // Nettoyage des champs non pertinents selon le type
+        ...(form.value.saleType === 'B2C' ? { buyerCompanyId: null } : { contactId: null })
+      };
     }
     
-    console.log('----------- SIMULATION TERMINÉE -----------')
-    console.log('✅ AUCUNE SAUVEGARDE EFFECTUÉE - Vérifiez la console pour les détails')
+    console.log(`----------- PRÉPARATION POUR ${isIntermediation ? 'INTERMÉDIATION' : 'VENTE DIRECTE'} -----------`);
     
-    // Commenter cette ligne pour ne pas rediriger et pouvoir voir la console
-    // router.push('/orders')
+    // 4. Appel à la fonction de sauvegarde appropriée
+    const functionName = store.getOrderFunctionName(form.value.saleType);
     
-    return result
+    console.log(`Appel de la fonction Supabase: ${functionName}`);
+    
+    // Préparation des données finales avec la méthode du store
+    const finalOrderData = store.prepareOrderData(orderData);
+    
+    // Pour le développement, afficher les données qui seront envoyées
+    console.log('Données préparées:', finalOrderData);
+    
+    const result = await store.createOrderWithFunction(finalOrderData);
+    
+    if (!result || !result.success) {
+      throw new Error(result?.error || "Échec de la création de la commande");
+    }
+    
+    console.log('Ordre créé avec succès:', result);
+    
+    // 5. Redirection après succès
+    router.push('/orders');
+    return result;
   } catch (error) {
-    console.error('❌ ERREUR CRITIQUE:', error)
+    console.error('❌ ERREUR:', error);
     return {
       success: false,
-      error: 'Erreur simulée'
-    }
+      error: (error as Error).message || 'Erreur inconnue'
+    };
   } finally {
-    saving.value = false
+    saving.value = false;
   }
 }
 
