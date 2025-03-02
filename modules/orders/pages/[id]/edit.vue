@@ -74,7 +74,8 @@
               <CardTitle class="text-base font-semibold">Notes</CardTitle>
             </CardHeader>
             <CardContent>
-              <Textarea v-model="form.comments" placeholder="Ajoutez des notes à la commande..." rows="4" />
+              <Textarea id="notes" v-model="form.comments" placeholder="Notes sur la commande..." :rows="4"
+                class="resize-none" />
             </CardContent>
           </Card>
         </div>
@@ -85,24 +86,15 @@
           <SaleTypeSelector v-model="form.saleType" :disabled="!isNew" />
 
           <!-- Contact ou Entreprises -->
-          <PartySelector 
-            :sale-type="form.saleType"
-            :contact-id="form.contactId"
-            :buyer-company-id="form.buyerCompanyId"
-            :seller-company-id="form.sellerCompanyId"
-            :seller-contact-id="form.sellerContactId"
-            :contacts="contacts"
-            :companies="companies"
-            @update:contact-id="form.contactId = $event"
+          <PartySelector :sale-type="form.saleType" :contact-id="form.contactId" :buyer-company-id="form.buyerCompanyId"
+            :seller-company-id="form.sellerCompanyId" :seller-contact-id="form.sellerContactId" :contacts="contacts"
+            :companies="companies" @update:contact-id="form.contactId = $event"
             @update:buyer-company-id="form.buyerCompanyId = $event"
             @update:seller-company-id="form.sellerCompanyId = $event"
-            @update:seller-contact-id="form.sellerContactId = $event"
-          />
+            @update:seller-contact-id="form.sellerContactId = $event" />
 
           <!-- Commissions -->
-          <CommissionList 
-            v-if="isIntermediationType(form.saleType)" 
-            v-model="form.commissions"
+          <CommissionList v-if="isIntermediationType(form.saleType) && canAddCommissions" v-model="form.commissions"
             :order-items="form.items.map(item => ({
               id: item.id,
               vehicle: item.vehicle ? {
@@ -111,11 +103,7 @@
                 model: item.vehicle.model,
                 vin: item.vehicle.vin || ''
               } : undefined
-            })) as any" 
-            :contacts="contacts" 
-            :companies="companies" 
-            :owner-id="currentOwnerId" 
-          />
+            })) as any" :contacts="selectedContacts" :companies="selectedCompanies" :owner-id="currentOwnerId" />
 
           <!-- Totaux -->
           <OrderSummary :items="form.items" :commissions="form.commissions" :display-margin="displayMargin" />
@@ -143,6 +131,8 @@ import type {
 } from '../../types'
 import { useReferenceData } from '../../composables/useReferenceData'
 import { useOrderIntermediation } from '../../composables/useOrderIntermediation'
+import { calculateOrderTotals } from '../../composables/useOrderCalculations'
+import { useReferenceStore } from '../../stores/useReferenceStore'
 import OrderItems from '../../components/OrderItems.vue'
 import OrderSummary from '../../components/OrderSummary.vue'
 import CommissionList from '../../components/CommissionList.vue'
@@ -159,15 +149,16 @@ import {
 } from '#components'
 import { useOwnerStore } from '@/stores/useOwnerStore'
 import { useCommissionStore } from '@/stores/useCommissionStore'
+import { useToast } from '@/components/ui/toast/use-toast'
 
 const route = useRoute()
 const router = useRouter()
 const store = useOrderStore()
-const { 
-  isIntermediationType, 
-  validateIntermediationParties, 
-  prepareIntermediationOrderData, 
-  associateCommissionsWithItems 
+const {
+  isIntermediationType,
+  validateIntermediationParties,
+  prepareIntermediationOrderData,
+  associateCommissionsWithItems
 } = useOrderIntermediation()
 
 // Récupérer le type de vente depuis la query si nouvelle commande
@@ -209,7 +200,8 @@ const form = ref<OrderFormData>({
   totalHt: 0,
   totalTva: 0,
   totalTtc: 0,
-  metadata: {}
+  metadata: {},
+  ownerCompanyId: undefined // Sera défini après le chargement du store
 })
 
 // Remplacer les refs contacts et companies par :
@@ -225,6 +217,10 @@ const {
 // Restaurer les déclarations
 const ownerStore = useOwnerStore()
 const commissionStore = useCommissionStore()
+
+const { toast } = useToast()
+
+const supabase = useSupabaseClient()
 
 // Méthodes
 const fetchOrder = async () => {
@@ -251,7 +247,8 @@ const fetchOrder = async () => {
         totalTva: data.totalTva,
         totalTtc: data.totalTtc,
         status: data.status,
-        metadata: data.metadata || {}
+        metadata: data.metadata || {},
+        ownerCompanyId: data.ownerCompanyId
       }
     }
   } catch (error) {
@@ -276,89 +273,167 @@ interface CreateOrderResponse {
 }
 
 const saveOrder = async () => {
-  saving.value = true
+  saving.value = true;
+
   try {
-    // 1. Déterminer le type de vente
+    // 1. Vérifier les quantités disponibles
+    const items = form.value.items.map(item => ({
+      vehicleId: item.vehicleId,
+      quantity: item.quantity
+    }));
+
+    console.log('Items:', items);
+
+    const { data: qtyCheck, error: qtyError } = await supabase
+      .rpc('check_vehicles_qty', { p_items: items });
+
+    if (qtyError) throw new Error(`Erreur lors de la vérification des quantités: ${qtyError.message}`);
+
+    if (!qtyCheck.success) {
+      const insufficientItems = qtyCheck.insufficient_items;
+      const itemsDetails = insufficientItems
+        .map((item: any) => `${item.internalId} (demandé: ${item.requested}, disponible: ${item.available})`)
+        .join(', ');
+
+      toast({
+        title: "Stock insuffisant",
+        description: `Les véhicules suivants n'ont pas assez de stock: ${itemsDetails}`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // 2. S'assurer que toutes les références nécessaires sont chargées
+    const referenceStore = useReferenceStore();
+    if (referenceStore.contacts.length === 0 || referenceStore.companies.length === 0 || referenceStore.vehicles.length === 0) {
+      console.log('Chargement des références pour le calcul de TVA...');
+      await referenceStore.fetchAllReferences();
+    }
+
+    // 3. Déterminer le type de vente
     const isIntermediation = isIntermediationType(form.value.saleType);
-    
-    // 2. Validation spécifique selon le type
+
+    // 4. Validation spécifique selon le type
     if (isIntermediation) {
-      // Validation pour l'intermédiation
       const { isValid, errors } = validateIntermediationParties(form.value);
       if (!isValid) {
         throw new Error(`Validation de l'intermédiation échouée: ${errors.join(', ')}`);
       }
-      
-      // Vérifier que des commissions sont définies (obligatoire pour l'intermédiation)
+
       if (!form.value.commissions || form.value.commissions.length === 0) {
         throw new Error("Une vente d'intermédiation nécessite au moins une commission");
       }
     } else {
-      // Validation pour vente directe
       if (form.value.saleType === 'B2C' && !form.value.contactId) {
         throw new Error("Un contact acheteur est requis pour une vente B2C");
       } else if (form.value.saleType === 'B2B' && !form.value.buyerCompanyId) {
         throw new Error("Une entreprise acheteuse est requise pour une vente B2B");
       }
     }
-    
-    // 3. Préparation des données spécifique au type
+
+    // 5. Préparation des données spécifique au type
     let orderData;
+
+    if (!currentOwnerId.value) {
+      throw new Error("L'ID de l'entreprise propriétaire est requis pour créer une commande");
+    }
+
     if (isIntermediation) {
-      // Préparation des données pour l'intermédiation
       orderData = prepareIntermediationOrderData(form.value);
-      
-      // Associer correctement les commissions aux articles
       orderData.commissions = associateCommissionsWithItems(
-        form.value.items, 
+        form.value.items,
         form.value.commissions
       );
-      
-      // Ajouter des métadonnées spécifiques à l'intermédiation
       orderData.metadata = {
         ...orderData.metadata,
         intermediation_type: form.value.saleType,
-        // Qui paie la commission (vendeur par défaut)
         commission_payer: orderData.metadata?.commission_payer || 'seller'
       };
     } else {
-      // Préparation des données pour vente directe
       orderData = {
         ...form.value,
-        // Dans une vente directe, pas besoin de seller_company_id pour B2C ou B2B
         sellerCompanyId: null,
         sellerContactId: null,
-        // Nettoyage des champs non pertinents selon le type
         ...(form.value.saleType === 'B2C' ? { buyerCompanyId: null } : { contactId: null })
       };
     }
-    
-    console.log(`----------- PRÉPARATION POUR ${isIntermediation ? 'INTERMÉDIATION' : 'VENTE DIRECTE'} -----------`);
-    
-    // 4. Appel à la fonction de sauvegarde appropriée
+
+    orderData.ownerCompanyId = currentOwnerId.value;
+
+    // 6. Calculer les totaux
+    console.log('Calcul des totaux avec application des règles de TVA...');
+    const calculatedTotals = calculateOrderTotals(orderData);
+    orderData.totalHt = calculatedTotals.totalHt;
+    orderData.totalTva = calculatedTotals.totalTva;
+    orderData.totalTtc = calculatedTotals.totalTtc;
+    orderData.items = calculatedTotals.items;
+
+    // 7. Créer la commande
     const functionName = store.getOrderFunctionName(form.value.saleType);
-    
-    console.log(`Appel de la fonction Supabase: ${functionName}`);
-    
-    // Préparation des données finales avec la méthode du store
     const finalOrderData = store.prepareOrderData(orderData);
-    
-    // Pour le développement, afficher les données qui seront envoyées
-    console.log('Données préparées:', finalOrderData);
-    
     const result = await store.createOrderWithFunction(finalOrderData);
-    
+
     if (!result || !result.success) {
       throw new Error(result?.error || "Échec de la création de la commande");
     }
-    
-    console.log('Ordre créé avec succès:', result);
-    
-    // 5. Redirection après succès
-    router.push('/orders');
+
+    // Récupérer les articles de la commande créée pour avoir les bons IDs
+    const { data: createdOrderItems, error: orderError } = await supabase
+      .from('order_items')
+      .select('id, vehicle_id')
+      .eq('order_id', result.orderId);
+
+    if (orderError) {
+      console.error('Erreur lors de la récupération des articles:', orderError);
+      throw new Error('Erreur lors de la récupération des articles de la commande');
+    }
+
+    // 8. Mettre à jour les stocks avec les bons IDs d'articles
+    const itemsWithOrderIds = form.value.items.map(item => {
+      // Trouver l'ID correspondant dans les articles créés
+      const createdItem = createdOrderItems.find(orderItem =>
+        orderItem.vehicle_id === item.vehicleId
+      );
+
+      return {
+        vehicleId: item.vehicleId,
+        quantity: item.quantity,
+        orderItemId: createdItem?.id
+      };
+    }).filter(item => item.orderItemId); // Ne garder que les articles avec un ID valide
+
+    const { data: stockUpdate, error: stockError } = await supabase
+      .rpc('update_vehicles_qty_and_stock', {
+        p_items: itemsWithOrderIds,
+        p_order_id: result.orderId
+      });
+
+    if (stockError) {
+      console.error('Erreur lors de la mise à jour des stocks:', stockError);
+      toast({
+        title: "Attention",
+        description: "La commande a été créée mais une erreur est survenue lors de la mise à jour des stocks.",
+        variant: "warning"
+      });
+    } else {
+      console.log('Stocks mis à jour avec succès:', stockUpdate);
+    }
+
+    // 9. Redirection après succès
+    toast({
+      title: "Commande créée",
+      description: `La commande ${result.orderNumber} a été créée avec succès.`
+    });
+
+    // router.push('/orders');
     return result;
   } catch (error) {
     console.error('❌ ERREUR:', error);
+    toast({
+      title: "Erreur",
+      description: (error as Error).message || 'Erreur inconnue',
+      variant: "destructive"
+    });
     return {
       success: false,
       error: (error as Error).message || 'Erreur inconnue'
@@ -418,6 +493,47 @@ const displayMargin = computed(() => {
   return form.value.saleType === 'B2B'
 })
 
+const selectedContacts = computed(() => {
+  // Pour une vente avec intermédiaire, inclure les contacts sélectionnés
+  if (isIntermediationType(form.value.saleType)) {
+    const selectedIds = [form.value.contactId, form.value.sellerContactId].filter(Boolean)
+    if (selectedIds.length === 0) return []
+    return contacts.value.filter(c => selectedIds.includes(c.id))
+  }
+  // Pour une vente B2C, retourner uniquement le contact acheteur s'il existe
+  if (form.value.saleType === 'B2C' && form.value.contactId) {
+    const selectedContact = contacts.value.find(c => c.id === form.value.contactId)
+    return selectedContact ? [selectedContact] : []
+  }
+  return []
+})
+
+const selectedCompanies = computed(() => {
+  // Pour une vente avec intermédiaire, inclure les entreprises sélectionnées
+  if (isIntermediationType(form.value.saleType)) {
+    const selectedIds = [form.value.buyerCompanyId, form.value.sellerCompanyId].filter(Boolean)
+    if (selectedIds.length === 0) return []
+    return companies.value.filter(c => selectedIds.includes(c.id))
+  }
+  // Pour une vente B2B, retourner uniquement l'entreprise acheteuse si elle existe
+  if (form.value.saleType === 'B2B' && form.value.buyerCompanyId) {
+    const selectedCompany = companies.value.find(c => c.id === form.value.buyerCompanyId)
+    return selectedCompany ? [selectedCompany] : []
+  }
+  return []
+})
+
+// Vérifier si on peut ajouter des commissions
+const canAddCommissions = computed(() => {
+  if (!isIntermediationType(form.value.saleType)) return false
+
+  // Vérifier qu'au moins un contact ou une entreprise est sélectionné
+  const hasContact = form.value.contactId || form.value.sellerContactId
+  const hasCompany = form.value.buyerCompanyId || form.value.sellerCompanyId
+
+  return hasContact || hasCompany
+})
+
 onMounted(async () => {
   try {
     await ownerStore.chargerDonneesOwner()
@@ -425,6 +541,11 @@ onMounted(async () => {
     await Promise.all([
       fetchReferences()
     ])
+
+    // Définir l'ID de l'entreprise propriétaire après le chargement
+    if (currentOwnerId.value) {
+      form.value.ownerCompanyId = currentOwnerId.value;
+    }
 
     if (isNew.value) {
       if (vehiclesWithQtyFromQuery.value.length > 0) {

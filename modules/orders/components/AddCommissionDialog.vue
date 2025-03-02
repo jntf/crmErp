@@ -78,11 +78,12 @@
               </span>
             </div>
             <Input 
-              v-model.number="form.amount" 
+              :model-value="form.amount.toString()"
               type="number" 
-              :min="currentCommissionSettings.hasMinAmount ? currentCommissionSettings.minAmount : 0"
-              :max="currentCommissionSettings.hasMaxAmount ? currentCommissionSettings.maxAmount : null"
+              :min="currentCommissionSettings?.hasMinAmount ? currentCommissionSettings.minAmount : 0"
+              :max="currentCommissionSettings?.hasMaxAmount ? currentCommissionSettings.maxAmount : undefined"
               step="0.01"
+              @input="(e: InputEvent) => form.amount = parseFloat(e.target.value) || 0"
             />
           </template>
           
@@ -95,12 +96,15 @@
               </span>
             </div>
             <Input 
-              v-model.number="form.rate" 
+              :model-value="form.rate.toString()"
               type="number" 
               min="0" 
               max="100" 
               step="0.01"
-              @input="calculateAmount"
+              @input="(e: InputEvent) => {
+                form.rate = parseFloat(e.target.value) || 0
+                calculateAmount()
+              }"
             />
           </template>
         </div>
@@ -126,47 +130,109 @@
         </div>
 
         <!-- Destinataire de la facture -->
-        <div class="space-y-2">
-          <Label>Destinataire de la facture</Label>
-          <Select 
-            :model-value="form.recipientType || ''"
-            @update:model-value="value => {
-              if (value === 'owner' || value === 'contact' || value === 'company' || value === null) {
-                form.recipientType = value
-              }
-            }"
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Sélectionnez le destinataire" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem v-if="ownerId" value="owner">Ma société</SelectItem>
-              <SelectItem value="contact">Contact</SelectItem>
-              <SelectItem value="company">Entreprise</SelectItem>
-            </SelectContent>
-          </Select>
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <Label>Destinataire de la facture</Label>
+            <div class="flex items-center gap-2">
+              <Label class="text-sm text-muted-foreground">Voir tous les destinataires</Label>
+              <Switch
+                v-model="showAllRecipients"
+                class="data-[state=checked]:bg-primary"
+              />
+            </div>
+          </div>
 
-          <div v-if="form.recipientType" class="mt-2">
-            <Label>{{ recipientTypeLabel }}</Label>
+          <!-- Mode simplifié : affichage des parties sélectionnées -->
+          <div v-if="!showAllRecipients" class="space-y-4">
+            <!-- Liste des contacts sélectionnés -->
+            <div v-if="contacts.length > 0" class="space-y-2">
+              <Label class="text-sm text-muted-foreground">Contacts</Label>
+              <RadioGroup 
+                :model-value="form.recipientId?.toString()"
+                class="space-y-2" 
+                @update:model-value="value => handleRecipientSelect(value, 'contact')"
+              >
+                <div v-for="contact in contacts" :key="contact.id" class="flex items-center space-x-2">
+                  <RadioGroupItem :value="contact.id.toString()" />
+                  <Label>{{ contact.name }}</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            <!-- Liste des entreprises sélectionnées -->
+            <div v-if="companies.length > 0" class="space-y-2">
+              <Label class="text-sm text-muted-foreground">Entreprises</Label>
+              <RadioGroup 
+                :model-value="form.recipientId?.toString()"
+                class="space-y-2" 
+                @update:model-value="value => handleRecipientSelect(value, 'company')"
+              >
+                <div v-for="company in companies" :key="company.id" class="flex items-center space-x-2">
+                  <RadioGroupItem :value="company.id.toString()" />
+                  <Label>{{ company.name }}</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            <!-- Ma société -->
+            <div v-if="ownerId" class="space-y-2">
+              <Label class="text-sm text-muted-foreground">Ma société</Label>
+              <RadioGroup 
+                :model-value="form.recipientId?.toString()"
+                class="space-y-2" 
+                @update:model-value="value => handleRecipientSelect(value, 'owner')"
+              >
+                <div class="flex items-center space-x-2">
+                  <RadioGroupItem :value="ownerId.toString()" />
+                  <Label>Ma société</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          </div>
+
+          <!-- Mode avancé : sélection complète -->
+          <div v-else class="space-y-4">
             <Select 
-              :model-value="form.recipientId ? form.recipientId.toString() : ''"
-              @update:model-value="value => form.recipientId = value ? parseInt(value) : null"
+              :model-value="form.recipientType || ''"
+              @update:model-value="value => {
+                if (value === 'owner' || value === 'contact' || value === 'company' || value === null) {
+                  form.recipientType = value
+                  form.recipientId = null
+                }
+              }"
             >
               <SelectTrigger>
-                <SelectValue :placeholder="`Sélectionnez ${recipientTypeLabel.toLowerCase()}`" />
+                <SelectValue placeholder="Sélectionnez le type de destinataire" />
               </SelectTrigger>
               <SelectContent>
-                <SelectGroup>
-                  <SelectItem 
-                    v-for="item in recipientList" 
-                    :key="item.id" 
-                    :value="item.id.toString()"
-                  >
-                    {{ item.name }}
-                  </SelectItem>
-                </SelectGroup>
+                <SelectItem v-if="ownerId" value="owner">Ma société</SelectItem>
+                <SelectItem value="contact">Contact</SelectItem>
+                <SelectItem value="company">Entreprise</SelectItem>
               </SelectContent>
             </Select>
+
+            <div v-if="form.recipientType" class="mt-2">
+              <Label>{{ recipientTypeLabel }}</Label>
+              <Select 
+                :model-value="form.recipientId ? form.recipientId.toString() : ''"
+                @update:model-value="value => form.recipientId = value ? parseInt(value) : null"
+              >
+                <SelectTrigger>
+                  <SelectValue :placeholder="`Sélectionnez ${recipientTypeLabel.toLowerCase()}`" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem 
+                      v-for="item in recipientList" 
+                      :key="item.id" 
+                      :value="item.id.toString()"
+                    >
+                      {{ item.name }}
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </form>
@@ -175,7 +241,7 @@
         <Button variant="ghost" type="button" @click="closeDialog">
           Annuler
         </Button>
-        <Button type="submit" @click="handleSubmit" :disabled="!isValid">
+        <Button type="submit" @click="handleSubmit" :disabled="!isValid || !hasRecipients">
           Ajouter
         </Button>
       </DialogFooter>
@@ -199,7 +265,9 @@ import {
   Button,
   Label,
   Input,
-  Checkbox,
+  Switch,
+  RadioGroup,
+  RadioGroupItem,
   Select,
   SelectContent,
   SelectGroup,
@@ -224,16 +292,34 @@ const emit = defineEmits<{
 const commissionStore = useCommissionStore()
 const ownerStore = useOwnerStore()
 
+interface FormState {
+  applyToAll: boolean
+  order_item_id: number | null
+  commission_type_id: number | null
+  rate: number
+  amount: number
+  recipientType: 'owner' | 'contact' | 'company' | null
+  recipientId: number | null
+}
+
+interface RadioValue {
+  value: string
+  type: 'owner' | 'contact' | 'company'
+}
+
 // État du formulaire
-const form = ref({
+const form = ref<FormState>({
   applyToAll: true,
-  order_item_id: null as number | null,
-  commission_type_id: null as number | null,
+  order_item_id: null,
+  commission_type_id: null,
   rate: 0,
   amount: 0,
-  recipientType: null as 'owner' | 'contact' | 'company' | null,
-  recipientId: null as number | null
+  recipientType: null,
+  recipientId: null
 })
+
+// État pour le switch d'affichage de tous les destinataires
+const showAllRecipients = ref(false)
 
 // Récupération des settings de l'owner
 const ownerSettings = computed(() => ownerStore.commissionSettings)
@@ -285,11 +371,17 @@ const recipientList = computed(() => {
   }
 })
 
-// Validation du formulaire avec les règles de l'owner
+// Vérifier si des destinataires sont disponibles
+const hasRecipients = computed(() => {
+  return (props.contacts && props.contacts.length > 0) || 
+         (props.companies && props.companies.length > 0) ||
+         props.ownerId !== undefined
+})
+
+// Mise à jour de la validation du formulaire
 const isValid = computed(() => {
-  if (!form.value.applyToAll && !form.value.order_item_id) return false
   if (!form.value.commission_type_id) return false
-  if (!form.value.recipientType || !form.value.recipientId) return false
+  if (!form.value.recipientId) return false
 
   const settings = currentCommissionSettings.value
   if (!settings) return false
@@ -452,7 +544,7 @@ const handleSubmit = () => {
   resetForm()
 }
 
-// Réinitialisation du formulaire
+// Reset du formulaire
 const resetForm = () => {
   form.value = {
     applyToAll: true,
@@ -463,6 +555,7 @@ const resetForm = () => {
     recipientType: null,
     recipientId: null
   }
+  showAllRecipients.value = false
 }
 
 // Watcher pour l'ouverture du dialog
@@ -541,4 +634,20 @@ const getAmountValidationMessage = computed(() => {
   
   return 'Le montant est valide'
 })
+
+// Fonction de gestion de la sélection du destinataire
+const handleRecipientSelect = (value: string | null, type: 'owner' | 'contact' | 'company') => {
+  if (value === null) {
+    form.value.recipientId = null
+    form.value.recipientType = null
+    return
+  }
+
+  form.value.recipientId = parseInt(value)
+  form.value.recipientType = type
+}
+
+interface InputEvent extends Event {
+  target: HTMLInputElement;
+}
 </script> 

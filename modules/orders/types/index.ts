@@ -31,6 +31,23 @@ export type PaymentStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED'
 export type CommissionType = 'MANDATE' | 'INTERMEDIARY' | 'PRIVATE_SALE'
 
 /**
+ * Interface représentant un pays
+ * @interface CountryInfo
+ */
+export interface CountryInfo {
+  /** Identifiant unique du pays */
+  id: number;
+  /** Code ISO à 2 lettres */
+  iso_code_2: string;
+  /** Nom du pays */
+  name: string;
+  /** Taux de TVA standard */
+  tva_rate: number;
+  /** Indique si le pays est membre de l'UE */
+  is_eu_member: boolean;
+}
+
+/**
  * Interface représentant un contact (client particulier)
  * @interface Contact
  */
@@ -39,6 +56,12 @@ export interface Contact {
   id: number
   /** Nom complet du contact */
   name: string
+  /** Prénom du contact */
+  first_name?: string
+  /** Nom de famille du contact */
+  last_name?: string
+  /** Pays du contact */
+  country: CountryInfo | null
 }
 
 /**
@@ -50,6 +73,10 @@ export interface Company {
   id: number
   /** Nom de l'entreprise */
   name: string
+  /** Numéro de TVA */
+  vat_number?: string
+  /** Pays de l'entreprise */
+  country: CountryInfo | null
 }
 
 /**
@@ -73,10 +100,14 @@ export interface Vehicle {
   vin: string | null
   /** Numéro d'immatriculation (optionnel) */
   registration_number?: string
+  /** Date d'immatriculation (optionnel) */
+  registration_date?: string | null
   /** Kilométrage du véhicule (optionnel) */
   mileage?: number
   /** Année de mise en circulation (optionnel) */
   year?: number
+  /** Type de stock (existant ou commande usine) */
+  stock_type?: 'existing' | 'factory_order'
   /** Quantité disponible (par défaut 1) */
   qty?: number
   /** Informations de prix du véhicule */
@@ -87,6 +118,8 @@ export interface Vehicle {
     selling_price_ht: number
     /** Frais de mise en service (FREVO) */
     frevo: number
+    /** Taux de TVA applicable */
+    vat_rate?: number
   }
 }
 
@@ -238,6 +271,8 @@ export interface Order {
   buyerCompanyId?: number
   /** Identifiant de l'entreprise vendeuse (optionnel) */
   sellerCompanyId?: number
+  /** Identifiant de l'entreprise propriétaire */
+  ownerCompanyId?: number
   /** Total HT */
   totalHt: number
   /** Montant de TVA */
@@ -303,6 +338,8 @@ export interface OrderFormData {
   sellerCompanyId?: number
   /** Identifiant du contact vendeur (optionnel, pour C2B2C et C2B2B) */
   sellerContactId?: number
+  /** Identifiant de l'entreprise propriétaire */
+  ownerCompanyId?: number
   /** Articles de la commande */
   items: OrderItem[]
   /** Commissions associées */

@@ -73,7 +73,7 @@ import { ref, computed } from '#imports'
 import { Tab, TabGroup, TabList, TabPanel, TabPanels } from '@headlessui/vue'
 import { ArrowLeft } from 'lucide-vue-next'
 import CommissionsTable from '../../components/CommissionsTable.vue'
-import { useCommissionStore } from '../../stores/useCommissionStoreModule'
+import { useOrderCommissionStore } from '../../stores/useOrderCommissionStore'
 import {
     Card,
     CardContent,
@@ -82,7 +82,7 @@ import {
 } from '#components'
 
 const activeTab = ref(0)
-const commissionStore = useCommissionStore()
+const commissionStore = useOrderCommissionStore()
 
 // Types pour les statuts de facture
 type InvoiceStatus = 'all' | 'pending' | 'paid' | 'cancelled'

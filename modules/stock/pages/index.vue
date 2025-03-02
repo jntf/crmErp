@@ -121,6 +121,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from '@/components/ui/toast/use-toast'
 import { useVehicleStore } from '../stores/useVehicleStore'
 import { exportToCSV, exportToExcel } from '@/components/DataTable/utils/export'
+import { DataTable } from '@/components/DataTable'
 import { VehicleStatusEnum } from '../types'
 import type { Vehicle, VehicleTableData, VehicleCreate } from '../types'
 import VehicleSearch from '../components/VehicleSearch.vue'

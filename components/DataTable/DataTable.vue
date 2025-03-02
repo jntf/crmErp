@@ -25,7 +25,7 @@
 
         <!-- Table -->
         <div v-else-if="isHydrated">
-            <hot-table 
+            <HotTable 
                 :data="processedTableData" 
                 :settings="mergedTableSettings" 
                 :rowHeaders="true"
@@ -45,6 +45,8 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import DataTableToolbar from './DataTableToolbar.vue'
 import { exportToCSV, exportToExcel, exportToPDF } from './utils/export'
+// Import direct du composant HotTable pour éviter les problèmes de résolution
+import { HotTable } from '@handsontable/vue3'
 
 // Types
 interface Column {

@@ -44,7 +44,10 @@
 
         <TabPanels class="mt-4">
           <TabPanel v-for="tab in tabs" :key="tab.value" as="div">
-            <OrderList :sale-type="tab.value" />
+            <OrderList 
+              :key="tab.value" 
+              :sale-type="tab.value" 
+            />
           </TabPanel>
         </TabPanels>
       </TabGroup>
@@ -53,14 +56,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { Tab, TabGroup, TabList, TabPanel, TabPanels } from '@headlessui/vue'
 import type { SaleType } from '../types'
 import OrderList from '@/modules/orders/components/OrderList.vue'
 import CreateOrderButton from '@/modules/orders/components/actions/CreateOrderButton.vue'
 import { Card } from '@/components/ui/card'
 
-const activeTab = ref(0)
+const activeTab = shallowRef(0)
 
 type TabValue = SaleType | 'ALL'
 

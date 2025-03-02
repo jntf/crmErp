@@ -156,7 +156,7 @@ import {
 } from '@tanstack/vue-table'
 import { ChevronDown, MoreHorizontal, ArrowUpDown } from 'lucide-vue-next'
 import { formatCurrency } from '@/utils/formatter'
-import { useCommissionStore } from '../stores/useCommissionStoreModule'
+import { useOrderCommissionStore } from '../stores/useOrderCommissionStore'
 import {
   Loader2Icon,
   CheckIcon,
@@ -190,7 +190,7 @@ const props = defineProps<{
 }>()
 
 // Store et états
-const commissionStore = useCommissionStore()
+const commissionStore = useOrderCommissionStore()
 const sorting = ref<SortingState>([])
 const columnFilters = ref<ColumnFiltersState>([])
 const columnVisibility = ref<VisibilityState>({

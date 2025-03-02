@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from '#imports'
 
 /**
- * Store pour la gestion des commissions
+ * Store pour la gestion des commissions de commandes
  * 
  * Ce store gère les opérations liées aux commissions, notamment :
  * - Récupération des commissions depuis la base de données
@@ -57,7 +57,8 @@ interface Commission {
   order_number: string
 }
 
-export const useCommissionStore = defineStore('commission', () => {
+// Renommé pour éviter les conflits avec le store racine
+export const useOrderCommissionStore = defineStore('orderCommission', () => {
   const commissions = ref<Commission[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)

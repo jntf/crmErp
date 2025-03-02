@@ -215,12 +215,16 @@ const error = ref<string | null>(null)
 
 const orderId = computed(() => Number(route.params.id))
 
+// Mémoriser les valeurs pour éviter les recalculs inutiles
 const canEdit = computed(() => {
-  return order.value?.status === 'DRAFT'
+  if (!order.value) return false
+  return order.value.status === 'DRAFT'
 })
 
+// Mémoriser les commissions pour éviter les recalculs inutiles
 const commissions = computed(() => {
-  return order.value?.items?.flatMap(item => item.commissions || []) || []
+  if (!order.value?.items) return []
+  return order.value.items.flatMap(item => item.commissions || [])
 })
 
 const getSaleTypeLabel = (type: SaleType) => {
@@ -232,12 +236,15 @@ const getSaleTypeLabel = (type: SaleType) => {
   return types[type]
 }
 
+// Optimiser le fetchOrder pour éviter les appels inutiles
 const fetchOrder = async () => {
+  if (loading.value) return // Éviter les appels multiples si déjà en cours
   loading.value = true
   error.value = null
   try {
     const data = await store.fetchOrderById(orderId.value)
     if (data) {
+      // Mise à jour atomique pour éviter les re-rendus multiples
       order.value = data
     } else {
       error.value = 'Commande introuvable'
