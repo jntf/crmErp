@@ -2,8 +2,7 @@
   <Dialog v-model:open="isOpen">
     <DialogTrigger asChild>
       <Button>
-        <PlusIcon class="mr-2 h-4 w-4" />
-        Nouvelle commande
+        <PlusIcon class="h-4 w-4" />
       </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-[425px]">
@@ -22,11 +21,7 @@
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem
-                  v-for="type in saleTypes"
-                  :key="type.value"
-                  :value="type.value"
-                >
+                <SelectItem v-for="type in saleTypes" :key="type.value" :value="type.value">
                   {{ type.label }}
                 </SelectItem>
               </SelectGroup>
@@ -38,11 +33,7 @@
         <Button variant="outline" @click="isOpen = false">
           Annuler
         </Button>
-        <Button
-          type="submit"
-          :disabled="!selectedType"
-          @click="createOrder"
-        >
+        <Button type="submit" :disabled="!selectedType" @click="createOrder">
           Créer
         </Button>
       </DialogFooter>
@@ -94,4 +85,4 @@ const createOrder = () => {
     isOpen.value = false
   }
 }
-</script> 
+</script>

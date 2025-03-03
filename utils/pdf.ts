@@ -1,37 +1,41 @@
-import { navigateTo } from '#app'
+import { generateOrderPDF, generateVehicleListPDF } from '~/services/pdfService'
 
+// Types
 export interface PdfExportData {
-    template: string
-    data?: any[]
+    template: 'order' | 'vehicle-list'
+    data: any
     columns?: any[]
     options?: {
         title?: string
         subtitle?: string
         orientation?: 'portrait' | 'landscape'
-        showDate?: boolean
-        dateFormat?: string
-        [key: string]: any
     }
 }
 
-const PDF_STORAGE_KEY = 'pdf_export_data'
-
-export const exportToPdf = async (data: PdfExportData) => {
+// Fonction d'export PDF
+export const exportToPdf = async (data: PdfExportData): Promise<Uint8Array | null> => {
     try {
-        // Stocker les données dans le localStorage
-        localStorage.setItem(PDF_STORAGE_KEY, JSON.stringify(data))
+        console.log('📄 Export - Génération du PDF avec les données:', data)
         
-        // Ouvrir la page de prévisualisation dans un nouvel onglet
-        await navigateTo('/pdf/preview', {
-            external: true,
-            open: {
-                target: '_blank'
-            }
-        })
+        let pdfBuffer: Uint8Array | null = null
         
-        return true
+        switch (data.template) {
+            case 'order':
+                pdfBuffer = await generateOrderPDF(data.data)
+                break
+            case 'vehicle-list':
+                if (!data.columns) {
+                    throw new Error('Les colonnes sont requises pour le template vehicle-list')
+                }
+                pdfBuffer = await generateVehicleListPDF(data.data, data.columns, data.options)
+                break
+            default:
+                throw new Error(`Template ${data.template} non supporté`)
+        }
+        
+        return pdfBuffer
     } catch (error) {
-        console.error('Erreur lors de l\'export PDF:', error)
-        return false
+        console.error('📄 Export - Erreur lors de la génération du PDF:', error)
+        return null
     }
 } 

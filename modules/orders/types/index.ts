@@ -75,6 +75,12 @@ export interface Company {
   name: string
   /** Numéro de TVA */
   vat_number?: string
+  /** Code NAF / APE */
+  domain?: string
+  /** Email de l'entreprise */
+  email?: string
+  /** Téléphone de l'entreprise */
+  phone?: string
   /** Pays de l'entreprise */
   country: CountryInfo | null
 }
@@ -403,4 +409,82 @@ export interface CommissionInvoice {
  * Statuts possibles pour une facture (incluant 'all' pour le filtrage)
  * @typedef {string} InvoiceStatus
  */
-export type InvoiceStatus = 'all' | 'pending' | 'paid' | 'cancelled' 
+export type InvoiceStatus = 'all' | 'pending' | 'paid' | 'cancelled'
+
+/**
+ * Interface représentant une adresse
+ * @interface Address
+ */
+export interface Address {
+  /** Identifiant unique de l'adresse */
+  id: number
+  /** Type d'entité (company ou contact) */
+  entity_type: 'company' | 'contact'
+  /** Identifiant de l'entité */
+  entity_id: number
+  /** Type d'adresse */
+  address_type: string
+  /** Numéro de rue */
+  street_number?: string
+  /** Nom de la rue */
+  street_name: string
+  /** Complément d'adresse */
+  address_line2?: string
+  /** Code postal */
+  postal_code: string
+  /** Ville */
+  city: string
+  /** État/Région (optionnel) */
+  state?: string
+  /** Identifiant du pays */
+  country_id: number
+  /** Indique si c'est l'adresse principale */
+  is_primary: boolean
+  /** Date de création */
+  created_at: string
+  /** Date de mise à jour */
+  updated_at: string
+}
+
+/**
+ * Interface représentant un pays
+ * @interface Country
+ */
+export interface Country {
+  /** Identifiant unique du pays */
+  id: number
+  /** Nom du pays */
+  name: string
+  /** Nom natif du pays */
+  native_name: string
+  /** Code ISO à 2 lettres */
+  iso_code_2: string
+  /** Code ISO à 3 lettres */
+  iso_code_3: string
+  /** Code numérique */
+  numeric_code: string
+  /** Capitale */
+  capital: string
+  /** Région */
+  region: string
+  /** Sous-région */
+  subregion: string
+  /** Emoji du drapeau */
+  flag_emoji: string
+  /** Code téléphonique */
+  phone_code: string
+  /** Code de la devise */
+  currency_code: string
+  /** Symbole de la devise */
+  currency_symbol: string
+  /** Devise */
+  currency: string
+  /** Taux de TVA */
+  tva_rate: number
+  /** Membre de l'UE */
+  is_eu_member: boolean
+  /** Actif */
+  is_active: boolean
+  /** Date de création */
+  created_at: string
+} 

@@ -21,10 +21,6 @@ export default defineNuxtConfig({
     'shadcn-nuxt',
     '@nuxtjs/supabase',
     '@pinia/nuxt',
-    ['@i2d/nuxt-pdf-frame', {
-      debug: process.env.NODE_ENV === 'development',
-      clientOnly: true
-    }],
     './modules/webStock',
     './modules/entity',
     './modules/stock',
@@ -55,12 +51,6 @@ export default defineNuxtConfig({
   components: {
     dirs: [
       '~/components',
-      {
-        path: '~/components',
-        pattern: '**/pdf/*PdfTemplate.vue',
-        global: true,
-        prefix: 'Pdf'
-      },
       {
         path: '~/modules',
         pattern: '**/composants/pdf/*.vue',

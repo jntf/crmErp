@@ -7,12 +7,8 @@
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end">
       <DropdownMenuItem @click="viewOrder">
-        <Pencil class="mr-2 h-4 w-4" />
+        <EyeIcon class="mr-2 h-4 w-4" />
         Voir
-      </DropdownMenuItem>
-      <DropdownMenuItem @click="editOrder">
-        <Pencil class="mr-2 h-4 w-4" />
-        Modifier
       </DropdownMenuItem>
       <DropdownMenuItem @click="downloadPdf">
         <Icon name="heroicons:document-arrow-down" class="mr-2 h-4 w-4" />
@@ -50,7 +46,7 @@ import {
   DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
-import { MoreHorizontal, Pencil, Trash } from 'lucide-vue-next'
+import { MoreHorizontal, EyeIcon } from 'lucide-vue-next'
 
 const props = defineProps<{
   order: Order
@@ -61,10 +57,6 @@ const store = useOrderStore()
 
 const viewOrder = () => {
   router.push('/orders/' + props.order.id)
-}
-
-const editOrder = () => {
-  router.push('/orders/' + props.order.id + '/edit')
 }
 
 const downloadPdf = async () => {
