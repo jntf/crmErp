@@ -38,7 +38,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { PlusCircle, Download, Trash2 } from 'lucide-vue-next'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ConfirmDialog } from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/toast/use-toast'
 import { useCompanies } from '../../composables/useCompanies'
 import { exportToCSV, exportToExcel } from '@/components/DataTable/utils/export'

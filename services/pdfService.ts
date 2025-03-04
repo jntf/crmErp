@@ -1,8 +1,10 @@
 import pdfMake from 'pdfmake/build/pdfmake'
-import pdfFonts from 'pdfmake/build/vfs_fonts'
 
-// Initialisation des polices par défaut
-pdfMake.vfs = pdfFonts.pdfMake.vfs
+// Fonction pour charger les polices dynamiquement
+async function loadFonts() {
+  const pdfFonts = await import('pdfmake/build/vfs_fonts')
+  pdfMake.vfs = pdfFonts.pdfMake.vfs
+}
 
 // Palette de couleurs étendue
 const colors = {
@@ -229,6 +231,8 @@ function createWatermark(text: string): string {
 
 // Fonction principale de génération de PDF pour les commandes
 export async function generateOrderPDF(orderData: any): Promise<Uint8Array> {
+  await loadFonts()
+
   const isNational = isNationalTransaction(
     orderData.order.sellerCompany?.country_id,
     orderData.order.buyerCompany?.country_id
@@ -913,6 +917,8 @@ export async function generateOrderPDF(orderData: any): Promise<Uint8Array> {
 
 // Fonction de génération de PDF pour la liste des véhicules
 export async function generateVehicleListPDF(data: any[], columns: any[], options: any = {}): Promise<Uint8Array> {
+  await loadFonts()
+  
   const docDefinition = {
     pageSize: 'A4',
     pageOrientation: 'landscape' as const,
