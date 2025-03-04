@@ -1,9 +1,49 @@
 import pdfMake from 'pdfmake/build/pdfmake'
 
-// Fonction pour charger les polices dynamiquement
 async function loadFonts() {
-  const pdfFonts = await import('pdfmake/build/vfs_fonts')
-  pdfMake.vfs = pdfFonts.pdfMake.vfs
+  try {
+    // Tenter d'utiliser l'importation dynamique
+    const pdfFonts = await import('pdfmake/build/vfs_fonts')
+    
+    // Vérifier si pdfFonts.pdfMake existe
+    if (pdfFonts.pdfMake) {
+      pdfMake.vfs = pdfFonts.pdfMake.vfs
+    } 
+    // Si pdfFonts.pdfMake n'existe pas, essayer d'accéder directement à pdfFonts.vfs
+    else if (pdfFonts.vfs) {
+      pdfMake.vfs = pdfFonts.vfs
+    }
+    // Sinon, utiliser l'objet pdfFonts lui-même comme vfs
+    else {
+      pdfMake.vfs = pdfFonts
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des polices:', error)
+    
+    // Solution de secours: importer globalement
+    try {
+      // @ts-ignore
+      if (window.pdfMake && window.pdfMake.vfs) {
+        // Utiliser vfs global si disponible
+        return
+      }
+      
+      // Essayer d'importer via require si disponible (pour les environnements Node.js/CommonJS)
+      // @ts-ignore
+      if (typeof require !== 'undefined') {
+        // @ts-ignore
+        const pdfFonts = require('pdfmake/build/vfs_fonts')
+        if (pdfFonts.pdfMake) {
+          pdfMake.vfs = pdfFonts.pdfMake.vfs
+        } else {
+          pdfMake.vfs = pdfFonts
+        }
+      }
+    } catch (fallbackError) {
+      console.error('Erreur lors du chargement des polices (fallback):', fallbackError)
+      throw new Error('Impossible de charger les polices pour pdfMake')
+    }
+  }
 }
 
 // Palette de couleurs étendue
@@ -905,11 +945,12 @@ export async function generateOrderPDF(orderData: any): Promise<Uint8Array> {
 
   return new Promise((resolve, reject) => {
     try {
-      // @ts-ignore - Ignorer les erreurs de type pour le contenu du document
+      // @ts-ignore
       pdfMake.createPdf(docDefinition).getBuffer((buffer: Uint8Array) => {
         resolve(buffer)
       })
     } catch (error) {
+      console.error('Erreur lors de la création du PDF:', error)
       reject(error)
     }
   })
@@ -918,7 +959,7 @@ export async function generateOrderPDF(orderData: any): Promise<Uint8Array> {
 // Fonction de génération de PDF pour la liste des véhicules
 export async function generateVehicleListPDF(data: any[], columns: any[], options: any = {}): Promise<Uint8Array> {
   await loadFonts()
-  
+
   const docDefinition = {
     pageSize: 'A4',
     pageOrientation: 'landscape' as const,
@@ -982,12 +1023,6 @@ export async function generateVehicleListPDF(data: any[], columns: any[], option
       // En-tête avec design amélioré
       {
         columns: [
-          {
-            width: 80,
-            image: '/logo.png',
-            fit: [80, 40],
-            margin: [0, 0, 0, 10]
-          },
           {
             width: '*',
             stack: [
@@ -1115,11 +1150,12 @@ export async function generateVehicleListPDF(data: any[], columns: any[], option
 
   return new Promise((resolve, reject) => {
     try {
-      // @ts-ignore - Ignorer les erreurs de type pour le contenu du document
+      // @ts-ignore
       pdfMake.createPdf(docDefinition).getBuffer((buffer: Uint8Array) => {
         resolve(buffer)
       })
     } catch (error) {
+      console.error('Erreur lors de la création du PDF:', error)
       reject(error)
     }
   })
