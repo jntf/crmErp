@@ -42,6 +42,10 @@
                     </div>
                 </div>
                 <div class="flex space-x-2">
+                    <Button v-if="order.status === 'DRAFT'" variant="default" size="sm" @click="editOrder">
+                        <PencilIcon class="h-4 w-4 mr-2" />
+                        Modifier
+                    </Button>
                     <Button v-if="order.status === 'DRAFT'" variant="default" size="sm" @click="validateOrder">
                         <CheckCircleIcon class="h-4 w-4" />
                     </Button>
@@ -118,7 +122,7 @@
                                     <p v-if="buyerCountry">
                                         {{ buyerCountry.name }}
                                         <span v-if="buyerCountry.flag_emoji" class="ml-1">{{ buyerCountry.flag_emoji
-                                        }}</span>
+                                            }}</span>
                                     </p>
                                 </div>
                             </div>
@@ -160,7 +164,7 @@
                                     <p v-if="sellerCountry">
                                         {{ sellerCountry.name }}
                                         <span v-if="sellerCountry.flag_emoji" class="ml-1">{{ sellerCountry.flag_emoji
-                                        }}</span>
+                                            }}</span>
                                     </p>
                                 </div>
                             </div>
@@ -211,7 +215,7 @@
                                                 class="text-xs">
                                                 <span class="ml-2">{{ commission.metadata?.recipient_name }}</span>
                                                 <span class="ml-2 font-medium">{{ formatCurrency(commission.amount)
-                                                }}</span>
+                                                    }}</span>
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -302,7 +306,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeftIcon, DownloadIcon, CheckCircleIcon, XCircleIcon, FileDownIcon } from 'lucide-vue-next'
+import { ArrowLeftIcon, DownloadIcon, CheckCircleIcon, XCircleIcon, FileDownIcon, PencilIcon } from 'lucide-vue-next'
 import { useOrderDetailStore } from '@/modules/orders/stores/useOrderDetailStore'
 import { useOrderOperations } from '@/modules/orders/composables/useOrderOperations'
 import { formatDate1, formatCurrency } from '~/utils/formatter'
@@ -593,7 +597,7 @@ const showPdfPreview = ref(false)
 const pdfBuffer = ref<Uint8Array | null>(null)
 
 // Fonction de téléchargement du PDF
-async function downloadPdf() {  
+async function downloadPdf() {
     if (!order.value) {
         toast({
             title: 'Erreur',
@@ -627,6 +631,7 @@ async function downloadPdf() {
 
         // Générer le PDF
         const buffer = await exportToPdf(pdfData)
+
         if (!buffer) {
             throw new Error('Erreur lors de la génération du PDF')
         }
@@ -684,6 +689,12 @@ const markAsPaid = async () => {
         await store.fetchOrderById(orderId.value)
     }
     actionInProgress.value = false
+}
+
+// Fonction pour éditer la commande
+const editOrder = () => {
+    if (!orderId.value) return
+    router.push(`/orders/${orderId.value}/edit`)
 }
 
 // Chargement des données

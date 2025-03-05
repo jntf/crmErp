@@ -32,17 +32,22 @@ export default defineNuxtModule({
         {
           name: 'orders-new',
           path: '/orders/new',
-          file: resolve('./pages/[id]/edit.vue')
+          file: resolve('./pages/[id]/create.vue')
         },
         {
-          name: 'orders-edit',
-          path: '/orders/:id/edit',
-          file: resolve('./pages/[id]/edit.vue')
+          name: 'orders-create',
+          path: '/orders/:id/create',
+          file: resolve('./pages/[id]/create.vue')
         },
         {
           name: 'orders-view',
           path: '/orders/:id',
           file: resolve('./pages/[id].vue')
+        },
+        {
+          name: 'orders-edit',
+          path: '/orders/:id/edit',
+          file: resolve('./pages/[id]/edit.vue')
         }
       )
     })
