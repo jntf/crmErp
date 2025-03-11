@@ -249,11 +249,23 @@ const fetchCountries = async () => {
     try {
         const { data, error } = await supabase
             .from('countries')
-            .select('id, name, iso_code_2 as code, flag_emoji')
+            .select(`
+                id, 
+                name, 
+                iso_code_2, 
+                flag_emoji
+            `)
             .order('name')
         
         if (error) throw error
-        if (data) countries.value = data as unknown as Country[]
+        if (data) {
+            countries.value = data.map(country => ({
+                id: country.id,
+                name: country.name,
+                code: country.iso_code_2,
+                flag_emoji: country.flag_emoji
+            })) as Country[]
+        }
     } catch (error) {
         console.error('Erreur lors du chargement des pays:', error)
         toast({
