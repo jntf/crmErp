@@ -1,125 +1,123 @@
-# DataTable pour le CRM-ERP
+# DataTable - Composant de tableau avancé
 
-Ce dossier contient deux implémentations de DataTable :
+Ce composant de tableau avancé offre de nombreuses fonctionnalités comme le tri, la pagination, la recherche, la sélection de lignes, l'épinglage de colonnes et le mode édition.
 
-1. **DataTable** - Nouvelle implémentation basée sur shadcn/TanStack Table (recommandée)
-2. **DataTableHand** - Ancienne implémentation basée sur Handsontable (à des fins de rétrocompatibilité)
+## Structure du projet
 
-## Nouvelle implémentation (DataTable)
+```
+components/DataTable/
+├── DataTable.vue                  # Composant principal
+├── index.ts                       # Point d'entrée avec exportations
+├── components/                    # Sous-composants
+│   ├── TableHeader.vue            # En-tête de la table
+│   ├── TableBody.vue              # Corps de la table
+│   ├── TablePagination.vue        # Pagination
+│   ├── TableToolbar.vue           # Barre d'outils principale
+│   └── KeyboardShortcutsHelp.vue  # Aide pour les raccourcis clavier
+├── composables/                   # Logique réutilisable (Composition API)
+│   ├── useTableState.ts           # Gestion de l'état global de la table
+│   ├── useTableSelection.ts       # Sélection de lignes
+│   ├── useTablePinning.ts         # Épinglage des colonnes
+│   ├── useTableEditing.ts         # Mode édition
+│   ├── useTablePagination.ts      # Pagination
+│   ├── useTableSearch.ts          # Recherche
+│   └── useTableExport.ts          # Fonctionnalités d'export
+├── types/                         # Définitions de types TypeScript
+│   └── table-types.ts             # Types pour le DataTable
+└── utils/                         # Utilitaires existants
+    └── tanstack/                  # Utilitaires pour TanStack Table
+        ├── column-helpers.ts      # Helpers pour les colonnes
+        └── DataTableSideToolbar.vue # Barre d'outils latérale
+```
 
-La nouvelle implémentation est basée sur [TanStack Table](https://tanstack.com/table) et les composants UI de shadcn. Elle offre une expérience utilisateur moderne, des performances améliorées et une meilleure intégration avec le reste de l'UI.
+## Utilisation
 
-### Fonctionnalités
-
-- Pagination
-- Tri des colonnes
-- Filtrage
-- Sélection de lignes
-- Visibilité des colonnes
-- Rendu de cellules personnalisé
-- Intégration avec shadcn UI
-- Thème Tailwind CSS
-
-### Utilisation de base
+### Exemple de base
 
 ```vue
 <template>
   <DataTable
     :columns="columns"
     :data="data"
-    :loading-state="loading"
     :pagination="true"
     :searchable="true"
-    search-field="brand"
     :column-toggle="true"
     :row-selection="true"
-    @selection="handleSelection"
   />
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
 import { DataTable } from '@/components/DataTable'
-import { type ColumnDef } from '@tanstack/vue-table'
-import { h } from 'vue'
+import { ref } from 'vue'
 
-// Définition des types de données
-interface Vehicle {
-  id: string
-  brand: string
-  model: string
-  // ...
-}
-
-// État
-const data = ref<Vehicle[]>([])
-const loading = ref(false)
-
+const columns = [
 // Définition des colonnes
-const columns: ColumnDef<Vehicle, any>[] = [
-  {
-    accessorKey: 'brand',
-    header: 'Marque',
-    cell: ({ row }) => h('div', {}, row.getValue('brand')),
-  },
-  {
-    accessorKey: 'model',
-    header: 'Modèle',
-    cell: ({ row }) => h('div', {}, row.getValue('model')),
-  },
-  // ...
 ]
 
-// Gestion des événements
-function handleSelection(rows: Vehicle[]) {
-  console.log('Lignes sélectionnées:', rows)
-}
+const data = ref([
+  // Données du tableau
+])
 </script>
 ```
 
-### Props disponibles
+### Props du composant principal
 
-| Prop | Type | Description | Par défaut |
-|------|------|-------------|------------|
-| `columns` | `ColumnDef<TData, any>[]` | Définitions des colonnes (format TanStack Table) | **Requis** |
-| `data` | `TData[]` | Données à afficher | **Requis** |
-| `loadingState` | `boolean` | État de chargement | `false` |
-| `pagination` | `boolean` | Activer la pagination | `false` |
-| `searchable` | `boolean` | Activer la recherche | `false` |
-| `searchField` | `string` | Champ sur lequel effectuer la recherche | - |
-| `columnToggle` | `boolean` | Permettre de masquer/afficher les colonnes | `false` |
-| `rowSelection` | `boolean` | Permettre la sélection des lignes | `false` |
+| Nom | Type | Défaut | Description |
+|-----|------|--------|-------------|
+| columns | ColumnDef<TData, any>[] | - | Définitions des colonnes |
+| data | TData[] | - | Données à afficher |
+| loadingState | boolean | false | État de chargement |
+| pagination | boolean | false | Activer/désactiver pagination |
+| searchable | boolean | false | Activer/désactiver recherche |
+| searchField | string | - | Champ de recherche |
+| columnToggle | boolean | false | Visibilité des colonnes |
+| columnPinning | boolean | false | Épinglage des colonnes (gauche uniquement) |
+| rowSelection | boolean | false | Sélection de lignes |
+| tableSettings | Record<string, any> | - | Paramètres supplémentaires du tableau |
+| tableLayout | 'auto' \| 'fixed' | 'fixed' | Disposition du tableau |
+| pageSizes | number[] | [10, 25, 50, 100, 500] | Tailles de page disponibles |
+| showKeyboardShortcutsHelp | boolean | false | Afficher l'aide sur les raccourcis clavier |
+| sideToolbar | boolean | false | Utiliser la barre d'outils latérale |
+| isEditable | boolean | false | Activer/désactiver le mode édition |
+| exportFilename | string | - | Nom de fichier pour l'export |
 
 ### Événements émis
 
-| Événement | Paramètres | Description |
-|-----------|------------|-------------|
-| `selection` | `selectedRows: TData[]` | Émis lorsque la sélection de lignes change |
-| `change` | `changes: any` | Émis lorsque les données sont modifiées |
-| `delete-request` | `rows: TData[]` | Émis lorsqu'une demande de suppression est effectuée |
+| Nom | Données | Description |
+|-----|---------|-------------|
+| selection | selectedRows: TData[] | Changement de sélection des lignes |
+| change | changes: any | Modifications des données |
+| delete-request | rows: TData[] | Demande de suppression de lignes |
+| export | format: string, data: any[], columns: any[] | Demande d'export |
+| toggle-readonly | - | Basculement entre mode lecture/édition |
+| save-changes | changes: Record<string, any>[] | Sauvegarde des modifications |
+| cancel-changes | - | Annulation des modifications |
 
-### Conversion depuis Handsontable
+## Fonctionnalités
 
-Pour faciliter la migration depuis l'ancienne implémentation, vous pouvez utiliser la fonction `convertHandsontableColumns` :
+### Raccourcis clavier
 
-```ts
-import { convertHandsontableColumns, type HandsontableColumn } from '@/components/DataTable'
+- **Shift + Clic** : Sélectionner plusieurs lignes consécutives
+- **Ctrl/Cmd + Clic** : Sélectionner/désélectionner une ligne sans affecter les autres
+- **Ctrl/Cmd + A** : Sélectionner toutes les lignes
+- **Échap** : Désélectionner toutes les lignes
 
-// Anciennes définitions de colonnes Handsontable
-const oldColumns: HandsontableColumn[] = [
-  { data: 'brand', title: 'Marque', type: 'text' },
-  { data: 'price', title: 'Prix', type: 'numeric', format: '0,0', suffix: ' €' },
-  // ...
-]
+### Mode édition
 
-// Conversion vers le format TanStack Table
-const newColumns = convertHandsontableColumns(oldColumns)
-```
+Le mode édition permet de modifier les cellules directement dans le tableau. Pour l'activer, définissez `isEditable` à `true`. Les modifications sont temporaires jusqu'à ce qu'elles soient enregistrées avec le bouton "Enregistrer".
 
-## Exemple complet
+### Épinglage des colonnes
 
-Consultez le fichier d'exemple dans `/components/DataTable/examples/SimpleExample.vue` pour un exemple complet d'utilisation.
+L'épinglage des colonnes permet de garder certaines colonnes toujours visibles lors du défilement horizontal. Pour l'activer, définissez `columnPinning` à `true`.
 
-## Ancienne implémentation (DataTableHand)
+### Barre d'outils latérale
 
-L'ancienne implémentation est conservée pour des raisons de compatibilité. Vous pouvez continuer à l'utiliser en important `DataTableHand` au lieu de `DataTable`. 
+La barre d'outils latérale offre des fonctionnalités supplémentaires comme l'export, le mode plein écran, et l'accès rapide à l'aide sur les raccourcis clavier. Pour l'activer, définissez `sideToolbar` à `true`.
+
+## Personnalisation des styles
+
+Les styles peuvent être personnalisés en modifiant les classes CSS. Le composant utilise Tailwind CSS et les classes sont organisées de manière logique pour faciliter la personnalisation.
+
+## Optimisations
+
+Cette version refactorisée du DataTable améliore considérablement la maintenabilité et la performance par rapport à l'ancienne version monolithique, tout en conservant toutes les fonctionnalités.

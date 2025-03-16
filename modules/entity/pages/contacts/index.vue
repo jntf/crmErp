@@ -17,19 +17,53 @@
         </div>
 
         <!-- Table principale -->
-        <DataTable 
-            :tableData="contactsData" 
-            :tableColumns="columns" 
+        <DataTable
+            :data="contactsData"
+            :columns="tableColumns"
+            :loading-state="loading"
+            :searchable="true"
+            :pagination="true"
+            :column-toggle="true"
+            :row-selection="true"
+            :side-toolbar="true"
             :tableSettings="tableSettings"
-            :cellRenderers="cellRenderers" 
-            :toolbarConfig="toolbarConfig" 
-            :loadingState="loading"
-            :selectedRows="selectedContacts" 
-            @selection="handleSelection" 
-            @change="handleChange" 
+            export-filename="liste-contacts"
+            :defaultSorting="[{ id: 'last_name', desc: false }]"
+            :getCoreRowModel="getCoreRowModel()"
+            :getSortedRowModel="getSortedRowModel()"
+            :getFilteredRowModel="getFilteredRowModel()"
+            @selection="handleSelection"
             @export="handleExport"
-            @delete-request="handleDeleteRequest" 
-        />
+            @delete-request="handleDeleteRequest"
+            ref="dataTableRef"
+        >
+            <!-- Slot pour les boutons supplémentaires dans la barre d'outils latérale -->
+            <template #side-toolbar-buttons>
+                <div class="w-full flex flex-col gap-1 mt-2">
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        class="w-full justify-start px-2"
+                        @click="router.push('/entity/contact/create')"
+                    >
+                        <PlusCircle class="h-3.5 w-3.5 mr-2 text-green-500" />
+                    </Button>
+                </div>
+            </template>
+
+            <!-- Slot pour les boutons additionnels dans la barre d'outils principale -->
+            <template #toolbar-end>
+                <Button 
+                    variant="ghost" 
+                    size="sm"
+                    @click="toggleFullScreenMode" 
+                    title="Basculer en mode plein écran"
+                >
+                    <Maximize2 v-if="!isFullScreen" class="h-4 w-4" />
+                    <Minimize2 v-else class="h-4 w-4" />
+                </Button>
+            </template>
+        </DataTable>
 
         <!-- Modal de confirmation pour la suppression -->
         <ConfirmDialog 
@@ -49,18 +83,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, h, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { PlusCircle, Download, Trash2, Eye } from 'lucide-vue-next'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, ConfirmDialog } from '@/components/ui/dialog'
+import { PlusCircle, Download, Trash2, Eye, Trash, Maximize2, Minimize2 } from 'lucide-vue-next'
+import { ConfirmDialog } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/toast/use-toast'
 import { useContacts } from '../../composables/useContacts'
 import { exportToCSV, exportToExcel } from '@/components/DataTable/utils/export'
-import type { CellRenderer } from '@/components/DataTable/types'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { 
+    createColumnHelper, 
+    getCoreRowModel,
+    getSortedRowModel, 
+    getFilteredRowModel 
+} from '@tanstack/vue-table'
+import type { ColumnDef, SortingState } from '@tanstack/vue-table'
+import type { Contact } from '../../types/contact.type'
+
+// Définition du type pour les colonnes
+type TableContact = Contact & {
+    companies?: { name: string; id: string }[];
+    [key: string]: any;
+}
 
 const router = useRouter()
 const { toast } = useToast()
 const showConfirmDialog = ref(false)
+const dataTableRef = ref(null)
+const isFullScreen = ref(false)
+const sortingState = ref<SortingState>([{ id: 'last_name', desc: false }])
 
 const {
     contactsData,
@@ -71,172 +123,201 @@ const {
     handleSelection
 } = useContacts()
 
-// Configuration des colonnes
-const columns = [
-    {
-        data: 'first_name',
-        title: 'Prénom',
-        type: 'text',
-        className: 'htLeft'
-    },
-    {
-        data: 'last_name',
-        title: 'Nom',
-        type: 'text',
-        className: 'htLeft'
-    },
-    {
-        data: 'email',
-        title: 'Email',
-        type: 'text',
-        className: 'htLeft'
-    },
-    {
-        data: 'phone',
-        title: 'Téléphone',
-        type: 'text',
-        className: 'htLeft'
-    },
-    {
-        data: 'mobile',
-        title: 'Mobile',
-        type: 'text',
-        className: 'htLeft'
-    },
-    {
-        data: 'companies',
-        title: 'Entreprises',
-        type: 'text',
-        className: 'htLeft',
-        renderer(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-            if (Array.isArray(value)) {
-                td.innerHTML = value.map(company => company.name).join(', ')
-            } else {
-                td.innerHTML = ''
-            }
-            return td
-        }
-    },
-    {
-        data: 'job_title',
-        title: 'Fonction',
-        type: 'text',
-        className: 'htLeft'
-    },
-    {
-        data: 'department',
-        title: 'Service',
-        type: 'text',
-        className: 'htLeft'
-    },
-    {
-        data: 'status',
-        title: 'Statut',
-        type: 'text',
-        width: 60,
-        className: 'text-center status-badge',
-        renderer(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-            td.innerHTML = `<span class="inline-flex items-center rounded-md px-2 text-xs font-medium ring-1 ring-inset ${
-                value === 'active' 
-                    ? 'bg-green-50 text-green-700 ring-green-600/20'
-                    : 'bg-gray-50 text-gray-600 ring-gray-500/10'
-            }">${value}</span>`
-            return td
-        }
-    },
-    {
-        data: 'actions',
-        title: 'Actions',
-        type: 'text',
-        width: 50,
-        className: 'htCenter',
-        renderer(instance: any, td: any, row: any, col: any, prop: any, value: any) {
-            td.innerHTML = value;
-            return td;
+// Fonction pour basculer en mode plein écran
+const toggleFullScreenMode = () => {
+    isFullScreen.value = !isFullScreen.value
+    
+    if (dataTableRef.value) {
+        // Accéder à la méthode toggleFullWidth du composant DataTable si elle existe
+        const table = dataTableRef.value as any
+        if (table.table?.options?.meta?.toggleFullWidth) {
+            table.table.options.meta.toggleFullWidth()
+        } else if (typeof table.toggleFullWidth === 'function') {
+            table.toggleFullWidth()
+        } else {
+            console.warn('La méthode toggleFullWidth n\'est pas disponible sur le composant DataTable')
         }
     }
+}
+
+// Helper pour créer les colonnes TanStack
+const columnHelper = createColumnHelper<TableContact>()
+
+// Fonction de rendu pour le statut avec badge
+const renderStatusBadge = (status: string) => {
+    const statusConfig = status === 'active'
+        ? { bg: 'bg-green-100', text: 'text-green-700', hover: 'hover:bg-green-100', dark: 'dark:bg-green-800/30 dark:text-green-400', label: 'Actif' }
+        : { bg: 'bg-gray-100', text: 'text-gray-700', hover: 'hover:bg-gray-100', dark: 'dark:bg-gray-800 dark:text-gray-400', label: 'Inactif' };
+    
+    return `<div class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusConfig.bg} ${statusConfig.text} ${statusConfig.dark}">${statusConfig.label}</div>`;
+}
+
+// Fonction pour le rendu de la cellule de statut
+const renderStatusCell = (info: any) => {
+    const status = info.row.getValue('status') as string;
+    return h('div', { innerHTML: renderStatusBadge(status) });
+}
+
+// Fonction pour rendre les entreprises associées
+const renderCompanies = (info: any) => {
+    const companies = info.row.getValue('companies');
+    if (Array.isArray(companies) && companies.length > 0) {
+        return h('div', { class: 'truncate' }, companies.map(company => company.name).join(', '));
+    }
+    return h('div', '-');
+}
+
+// Configuration des colonnes pour TanStack Table
+const columns = [
+    columnHelper.accessor('first_name', {
+        header: 'Prénom',
+        cell: ({ row }) => row.getValue('first_name'),
+        enableSorting: true,
+        enableHiding: true,
+        size: 120
+    }),
+    columnHelper.accessor('last_name', {
+        header: 'Nom',
+        cell: ({ row }) => row.getValue('last_name'),
+        enableSorting: true,
+        enableHiding: true,
+        size: 120
+    }),
+    columnHelper.accessor('email', {
+        header: 'Email',
+        cell: ({ row }) => row.getValue('email'),
+        enableSorting: true,
+        enableHiding: true,
+        size: 180
+    }),
+    columnHelper.accessor('phone', {
+        header: 'Téléphone',
+        cell: ({ row }) => row.getValue('phone'),
+        enableSorting: true,
+        enableHiding: true,
+        size: 120
+    }),
+    columnHelper.accessor('mobile', {
+        header: 'Mobile',
+        cell: ({ row }) => row.getValue('mobile'),
+        enableSorting: true,
+        enableHiding: true,
+        size: 120
+    }),
+    columnHelper.accessor('companies', {
+        header: 'Entreprises',
+        cell: renderCompanies,
+        enableSorting: true,
+        enableHiding: true,
+        size: 180
+    }),
+    columnHelper.accessor('job_title', {
+        header: 'Fonction',
+        cell: ({ row }) => row.getValue('job_title'),
+        enableSorting: true,
+        enableHiding: true,
+        size: 120
+    }),
+    columnHelper.accessor('department', {
+        header: 'Service',
+        cell: ({ row }) => row.getValue('department'),
+        enableSorting: true,
+        enableHiding: true,
+        size: 120
+    }),
+    columnHelper.accessor('status', {
+        header: 'Statut',
+        cell: renderStatusCell,
+        enableSorting: true,
+        enableHiding: true,
+        size: 80,
+    }),
+    columnHelper.display({
+        id: 'actions',
+        header: 'Actions',
+        cell: ({ row }) => {
+            return h('div', { class: 'flex gap-2 justify-center' }, [
+                h('button', {
+                    onClick: (e: Event) => {
+                        e.stopPropagation()
+                        router.push(`/entity/contact/${row.original.id}`)
+                    },
+                    class: 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300',
+                    title: 'Voir'
+                }, [h(Eye, { class: 'h-4 w-4' })]),
+                h('button', {
+                    onClick: (e: Event) => {
+                        e.stopPropagation()
+                        handleDeleteRequest([row.original])
+                    },
+                    class: 'text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300',
+                    title: 'Supprimer'
+                }, [h(Trash, { class: 'h-4 w-4' })])
+            ])
+        },
+        enableSorting: false,
+        enableHiding: false,
+        size: 80,
+    })
 ]
 
-// Configuration de la table
+// Convertir les colonnes pour le composant DataTable
+const tableColumns = columns as ColumnDef<TableContact>[]
+
+// Settings pour le tableau
 const tableSettings = {
-    stretchH: 'all',
-    autoWrapRow: true,
-    rowHeights: 35,
-    contextMenu: true,
     height: '70vh',
-    selectionMode: 'multiple',
-    outsideClickDeselects: false,
-    multiSelect: true,
+    fixedHeaderTop: true,
+    stretchH: 'none',     // Ne pas étirer les colonnes
+    autoWrapRow: false,   // Pas de retour à la ligne automatique
+    wordWrap: false,      // Pas de retour à la ligne
+    rowHeights: 32,       // Hauteur de ligne réduite
     currentRowClassName: 'current-row',
     currentColClassName: 'current-col',
-    manualColumnResize: true,
-    fixedRowsTop: 1,
-    fixedColumnsLeft: 2,
-    renderAllRows: false,
-    viewportRowRenderingOffset: 20,
-    rowHeaders: true,
-    afterSelectionEnd: (rowStart: number, colStart: number, rowEnd: number, colEnd: number) => {
-        console.log('Selection:', { rowStart, colStart, rowEnd, colEnd });
-    },
-    afterOnCellMouseDown: (event: MouseEvent, coords: any, TD: HTMLElement) => {
-        const deleteButton = TD.querySelector('.delete-button');
-        const viewButton = TD.querySelector('.edit-button');
-        if (deleteButton && (event.target === deleteButton || deleteButton.contains(event.target as Node))) {
-            event.stopPropagation();
-            const rowData = contactsData.value[coords.row];
-            if (rowData) {
-                showConfirmDialog.value = true;
-                handleSelection([rowData]);
-            }
-        } else if (viewButton && (event.target === viewButton || viewButton.contains(event.target as Node))) {
-            event.stopPropagation();
-            const rowData = contactsData.value[coords.row];
-            if (rowData) {
-                router.push(`/entity/contact/${rowData.id}`);
-            }
-        }
-    }
+    fixedWidth: true,     // Forcer la largeur fixe des colonnes
+    tableLayout: 'fixed'  // Utiliser table-layout: fixed
 }
 
-// Configuration de la barre d'outils
-const toolbarConfig = {
-    enableSearch: true,
-    enableColumnFilter: true,
-    enableExport: true,
-    enableDelete: true
+// Fonction pour gérer la demande de suppression
+const handleDeleteRequest = (rows: TableContact[]) => {
+    handleSelection(rows)
+    showConfirmDialog.value = true
 }
 
-// Gestionnaires d'événements
-const handleChange = async (changes: any[]) => {
-    // Implémenter la logique de mise à jour
-    console.log('Changes:', changes)
-}
+// Fonction pour gérer l'export
+function handleExport(format: string) {
+    const dataToExport = selectedContacts.value.length > 0
+        ? selectedContacts.value
+        : contactsData.value
 
-const handleExport = async (format: 'csv' | 'excel') => {
-    const data = selectedContacts.value.length ? selectedContacts.value : contactsData.value
-    const filename = `contacts_export_${new Date().toISOString().split('T')[0]}`
+    // Convertir les colonnes pour l'export
+    const exportColumns = columns
+        .filter(col => 'accessorKey' in col || 'accessor' in col)
+        .map(col => ({
+            data: 'accessorKey' in col ? col.accessorKey as string : 
+                 ('accessor' in col && typeof col.accessor === 'string' ? col.accessor : col.id),
+            title: typeof col.header === 'string' ? col.header : col.id
+        }))
 
     if (format === 'csv') {
-        await exportToCSV(data, filename, columns)
-    } else {
-        await exportToExcel(data, filename, columns)
+        exportToCSV(dataToExport, exportColumns, 'liste-contacts')
+    } else if (format === 'excel') {
+        exportToExcel(dataToExport, exportColumns, 'liste-contacts')
     }
 }
 
-const handleDeleteRequest = () => {
-    if (selectedContacts.value.length > 0) {
-        showConfirmDialog.value = true
-    }
-}
-
-const confirmDelete = async () => {
+// Fonction pour confirmer la suppression
+async function confirmDelete() {
     try {
-        await deleteContacts(selectedContacts.value.map(contact => contact.id))
+        const contactIds = selectedContacts.value.map(c => c.id)
+        await deleteContacts(contactIds)
         showConfirmDialog.value = false
+
         toast({
             title: "Suppression réussie",
-            description: `${selectedContacts.value.length} contact(s) supprimé(s)`,
+            description: "Les contacts sélectionnés ont été supprimés"
         })
+
         // Rafraîchir les données après la suppression
         await fetchContacts()
     } catch (err) {
@@ -248,24 +329,78 @@ const confirmDelete = async () => {
     }
 }
 
-// Cell Renderers pour les actions
-const cellRenderers = {
-    actions: () => {
-        return `<span class="edit-button inline-flex items-center justify-center h-4 w-4 text-gray-500 cursor-pointer opacity-70 hover:opacity-100 mr-2" title="Voir">👁️</span><span class="delete-button text-red-500 inline-flex items-center justify-center h-4 w-4 text-red-500 cursor-pointer opacity-70 hover:opacity-100" title="Supprimer">🗑️</span>`
-    }
-}
-
 onMounted(() => {
     fetchContacts()
+    
+    // Initialiser le tri après le montage du composant
+    nextTick(() => {
+        if (dataTableRef.value) {
+            // Accéder à l'instance de la table
+            const tableInstance = (dataTableRef.value as any).table
+            
+            // Définir le tri initial si l'instance existe
+            if (tableInstance) {
+                tableInstance.setSorting([{ id: 'last_name', desc: false }])
+            }
+        }
+    })
+})
+
+// Nettoyage des écouteurs au démontage
+onUnmounted(() => {
+    // Si des écouteurs sont ajoutés, les nettoyer ici
 })
 </script>
 
 <style>
-.current-row {
-    background-color: rgba(233, 237, 244, 0.4) !important;
+/* Styles pour garantir les largeurs fixes */
+:deep(table) {
+  width: auto !important;
+  table-layout: fixed !important;
 }
 
-.current-col {
-    background-color: rgba(233, 237, 244, 0.2) !important;
+:deep(th),
+:deep(td) {
+  box-sizing: border-box !important;
+  white-space: nowrap !important;
+  word-break: break-word !important;
+}
+
+:deep(.fixed-width-cell) {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+:deep(.truncate) {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+  display: block !important;
+}
+
+/* Style pour optimiser l'affichage du tableau */
+:deep(.current-row) {
+  background-color: rgba(233, 237, 244, 0.4) !important;
+}
+
+:deep(.current-col) {
+  background-color: rgba(233, 237, 244, 0.2) !important;
+}
+
+/* S'assurer que la barre d'outils latérale reste accessible en mode plein écran */
+:deep(.full-width-container .absolute.-left-12) {
+  left: 0 !important;
+  z-index: 60 !important;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  padding: 8px 0;
+  margin-left: 8px;
+}
+
+:deep(.dark .full-width-container .absolute.-left-12) {
+  background-color: rgba(17, 24, 39, 0.8);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 </style> 

@@ -7,12 +7,21 @@
       :pagination="props.pagination !== undefined ? props.pagination : true"
       :searchable="true"
       :columnToggle="props.columnToggle !== undefined ? props.columnToggle : true"
-      :columnPinning="true"
+      :columnPinning="props.columnPinning !== undefined ? props.columnPinning : true"
       :rowSelection="true"
       :pageSizes="[25, 50, 100, 500]"
       :tableSettings="defaultSettings"
+      :side-toolbar="true"
+      :export-filename="'vehicules-export'"
+      :isEditable="true"
+      :read-only="isReadOnly"
       @selection="handleSelection"
       @delete-request="handleDeleteRequest"
+      @export="handleExport"
+      @toggle-fullwidth="handleToggleFullWidth"
+      @toggle-readonly="handleToggleReadOnly"
+      @save-changes="handleSaveChanges"
+      @cancel-changes="handleCancelChanges"
       ref="dataTableRef"
     >
       <template #toolbar-start>
@@ -26,16 +35,20 @@
         </Button>
       </template>
       
-      <template #toolbar-end>
+      <template #side-toolbar-buttons>
         <Button 
-          variant="outline" 
-          size="sm"
-          @click="pinDefaultColumns"
-          class="mr-2"
-          title="Épingler les colonnes principales (Statut, Marque, Modèle)"
+          variant="ghost" 
+          size="icon" 
+          class="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+          @click="toggleDefaultColumns"
+          :title="hasDefaultColumnsPinned ? 'Désépingler les colonnes' : 'Épingler les colonnes principales'"
         >
-          <Pin class="w-4 h-4 mr-2" />
-          Colonnes par défaut
+          <component 
+            :is="hasDefaultColumnsPinned ? PinOff : Pin" 
+            class="h-4 w-4" 
+            :class="{'text-green-500 dark:text-green-400': hasDefaultColumnsPinned}"
+          />
+          <span class="sr-only">{{ hasDefaultColumnsPinned ? 'Désépingler les colonnes' : 'Épingler les colonnes principales' }}</span>
         </Button>
       </template>
     </DataTable>
@@ -43,8 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h, onUnmounted } from 'vue'
-import { DataTable } from '@/components/DataTable'
+import { ref, computed, onMounted, h, onUnmounted, nextTick } from 'vue'
 import type { ColumnDef } from '@tanstack/vue-table'
 import { Button } from '@/components/ui/button'
 import { useVehicleStore } from '../stores/useVehicleStore'
@@ -53,7 +65,15 @@ import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import type { Vehicle } from '../types'
 import TextWithHoverCard from './TextWithHoverCard.vue'
-import { Pin } from 'lucide-vue-next'
+import { Pin, PinOff, Maximize2, Minimize2 } from 'lucide-vue-next'
+import { createEditableColumn } from '@/components/DataTable/utils/editable/createEditableColumn'
+
+// État pour le mode plein écran
+const isFullScreen = ref(false)
+// État pour suivre si les colonnes par défaut sont épinglées
+const hasDefaultColumnsPinned = ref(false)
+// État pour suivre le mode lecture seule
+const isReadOnly = ref(true) // Débuter en mode lecture
 
 // Props
 interface Props {
@@ -77,6 +97,8 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   'selection': [selectedRows: Vehicle[]];
   'delete-request': [rowData: Vehicle[]];
+  'export': [format: string, data: any[], columns: any[]];
+  'save-changes': [changes: any[]];
 }>()
 
 // État local
@@ -86,6 +108,82 @@ const dataTableRef = ref<any>(null)
 
 // Store
 const vehicleStore = useVehicleStore()
+
+// Liste des colonnes par défaut à épingler
+const defaultPinnedColumns = ['vehicle_status', 'brand', 'model', 'version', 'year', 'mileage', 'color']
+
+// Méthode pour épingler/désépingler les colonnes par défaut
+const toggleDefaultColumns = () => {
+  if (dataTableRef.value?.table) {
+    if (hasDefaultColumnsPinned.value) {
+      // Désépingler toutes les colonnes
+      dataTableRef.value.table.setColumnPinning({
+        left: [],
+        right: []
+      })
+      hasDefaultColumnsPinned.value = false
+    } else {
+      // Épingler les colonnes par défaut
+      dataTableRef.value.table.setColumnPinning({
+        left: defaultPinnedColumns,
+        right: []
+      })
+      hasDefaultColumnsPinned.value = true
+    }
+  }
+}
+
+// Méthode pour épingler les colonnes par défaut (maintenue pour compatibilité)
+const pinDefaultColumns = () => {
+  if (dataTableRef.value?.table) {
+    dataTableRef.value.table.setColumnPinning({
+      left: defaultPinnedColumns,
+      right: []
+    })
+    hasDefaultColumnsPinned.value = true
+  }
+}
+
+// Gérer l'événement toggle-fullwidth du DataTable pour synchroniser l'état
+function handleToggleFullWidth() {
+  isFullScreen.value = !isFullScreen.value
+}
+
+// Fonction pour gérer la bascule entre mode lecture et édition
+function handleToggleReadOnly() {
+  isReadOnly.value = !isReadOnly.value
+  console.log('Mode édition basculé, lecture seule:', isReadOnly.value)
+}
+
+// Fonction pour gérer la sauvegarde des modifications
+function handleSaveChanges(changes: any[]) {
+  console.log('Changements à sauvegarder:', changes)
+  
+  // Version simplifiée pour éviter les erreurs de type
+  // Cette partie devra être adaptée selon votre modèle de données exact
+  changes.forEach(change => {
+    // Identifier l'élément à modifier via rowId
+    const rowId = change.rowId
+    const columnId = change.columnId
+    const newValue = change.value
+    
+    console.log(`Mise à jour: ligne ${rowId}, colonne ${columnId}, nouvelle valeur:`, newValue)
+    
+    // Ici, vous pourriez implémenter la mise à jour réelle des données
+    // selon la structure de votre store vehicleStore
+    // Par exemple:
+    // vehicleStore.updateVehicle(rowId, { [columnId]: newValue })
+  })
+  
+  // Émettre l'événement vers le parent
+  emit('save-changes', changes)
+}
+
+// Fonction pour gérer l'annulation des modifications
+function handleCancelChanges() {
+  console.log('Modifications annulées')
+  // Vous pouvez ajouter ici une logique pour réinitialiser l'UI si nécessaire
+}
 
 // Settings par défaut
 const defaultSettings = {
@@ -136,22 +234,18 @@ const tanstackColumns = computed<ColumnDef<any, any>[]>(() => [
     enableSorting: true,
     cell: renderStatusCell
   },
-  {
-    id: 'brand',
+  createEditableColumn({
     accessorKey: 'brand',
     header: 'Marque',
-    size: 100,
-    enableHiding: true,
-    enableSorting: true,
-  },
-  {
-    id: 'model',
+    type: 'text',
+    size: 100
+  }),
+  createEditableColumn({
     accessorKey: 'model',
     header: 'Modèle',
-    size: 100,
-    enableHiding: true,
-    enableSorting: true,
-  },
+    type: 'text',
+    size: 100
+  }),
   {
     id: 'version',
     accessorKey: 'version',
@@ -159,6 +253,10 @@ const tanstackColumns = computed<ColumnDef<any, any>[]>(() => [
     size: 120,
     enableHiding: true,
     enableSorting: true,
+    cell: (info) => {
+      const serie = info.row.getValue('version') as string
+      return h(TextWithHoverCard, { text: serie })
+    }
   },
   {
     id: 'registration_date',
@@ -187,25 +285,24 @@ const tanstackColumns = computed<ColumnDef<any, any>[]>(() => [
     enableHiding: true,
     enableSorting: true,
   },
-  {
-    id: 'mileage',
+  createEditableColumn({
     accessorKey: 'mileage',
-    header: 'Kilométrage',
+    header: 'Km',
+    type: 'number',
     size: 80,
-    enableHiding: true,
-    enableSorting: true,
-    cell: (info) => {
-      const mileage = info.row.getValue('mileage')
-      return mileage ? `${mileage} km` : '-'
-    },
-  },
+    format: (value) => value ? `${value} km` : '-'
+  }),
   {
     id: 'color',
     accessorKey: 'color',
     header: 'Couleur',
-    size: 80,
+    size: 100,
     enableHiding: true,
     enableSorting: true,
+    cell: (info) => {
+      const serie = info.row.getValue('color') as string
+      return h(TextWithHoverCard, { text: serie })
+    }
   },
   {
     id: 'fuel_type',
@@ -227,14 +324,18 @@ const tanstackColumns = computed<ColumnDef<any, any>[]>(() => [
     id: 'vin',
     accessorKey: 'vin',
     header: 'VIN',
-    size: 130,
+    size: 90,
     enableHiding: true,
     enableSorting: true,
+    cell: (info) => {
+      const serie = info.row.getValue('vin') as string
+      return h(TextWithHoverCard, { text: serie })
+    }
   },
   {
     id: 'registration_number',
     accessorKey: 'registration_number',
-    header: 'Immatriculation',
+    header: 'Immat',
     size: 90,
     enableHiding: true,
     enableSorting: true,
@@ -476,6 +577,12 @@ function handleDeleteRequest(rows: Vehicle[]) {
   emit('delete-request', rows)
 }
 
+// Gestion de l'export
+function handleExport(format: string, data: any[], columns: any[]) {
+  emit('export', format, data, columns)
+  console.log(`Export des véhicules au format ${format} - ${data.length} véhicules exportés`)
+}
+
 // Gestion du clic sur le bouton de suppression
 function handleDeleteClick(vehicle: Vehicle) {
   emit('delete-request', [vehicle])
@@ -487,24 +594,32 @@ function handleViewVehicle(vehicle: Vehicle) {
   console.log('Visualisation du véhicule:', vehicle.id)
 }
 
-// Méthode pour épingler les colonnes par défaut
-const pinDefaultColumns = () => {
-  if (dataTableRef.value?.table) {
-    dataTableRef.value.table.setColumnPinning({
-      left: ['vehicle_status', 'brand', 'model'],
-      right: []
-    })
-  }
-}
-
 // Initialisation
 onMounted(() => {
+  // Lors du montage, ajouter une référence au bouton de plein écran pour pouvoir y accéder plus tard
+  nextTick(() => {
+    if (dataTableRef.value && dataTableRef.value.$el) {
+      // Ajouter une classe aux boutons de plein écran pour les identifier facilement
+      const fullWidthButton = dataTableRef.value.$el.querySelector('.DataTableSideToolbar button[title*="Pleine largeur"], .DataTableSideToolbar button[title*="Réduire"]');
+      if (fullWidthButton) {
+        fullWidthButton.classList.add('side-toolbar-fullwidth-button');
+      }
+    }
+  });
+  
   if (!props.dataSource) {
-    fetchVehicles()
+    fetchVehicles();
   }
   
   // Épingler les colonnes par défaut après le montage du composant
-  setTimeout(pinDefaultColumns, 100)
+  setTimeout(() => {
+    pinDefaultColumns();
+    // Vérifier l'état des colonnes épinglées pour mettre à jour l'indicateur visuel
+    if (dataTableRef.value?.table) {
+      const pinnedColumns = dataTableRef.value.table.getState().columnPinning?.left || [];
+      hasDefaultColumnsPinned.value = pinnedColumns.length > 0;
+    }
+  }, 100);
 })
 
 // Nettoyage des écouteurs au démontage
@@ -552,5 +667,21 @@ onUnmounted(() => {
 /* Hover Cards */
 :deep(.hover-card-content) {
   z-index: 9999 !important;
+}
+
+/* S'assurer que la barre d'outils latérale reste accessible en mode plein écran */
+:deep(.full-width-container .absolute.-left-12) {
+  left: 0 !important;
+  z-index: 60 !important;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  padding: 8px 0;
+  margin-left: 8px;
+}
+
+:deep(.dark .full-width-container .absolute.-left-12) {
+  background-color: rgba(17, 24, 39, 0.8);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 </style> 

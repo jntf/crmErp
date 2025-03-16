@@ -1,7 +1,7 @@
 <template>
   <DataTable
     :data="dataToUse"
-    :columns="columnsToUse"
+    :columns="columnsToUse as ColumnDef<unknown, any>[]"
     :loading-state="loadingState"
     :table-settings="tableSettings"
     :pagination="true"
@@ -9,18 +9,26 @@
     :column-toggle="true"
     :row-selection="true"
     :table-layout="tableSettings?.tableLayout || 'fixed'"
+    :side-toolbar="toolbarConfig?.useSideToolbar || false"
+    :is-editable="toolbarConfig?.isEditable || false"
+    :export-filename="toolbarConfig?.exportFilename || 'export'"
     @selection="handleSelection"
     @delete-request="handleDeleteRequest"
+    @export="handleExport"
+    @toggle-readonly="handleToggleReadOnly"
   >
     <template #toolbar-start>
       <slot name="toolbar-actions" :selectedItems="selectedItems"></slot>
+    </template>
+    <template #side-toolbar-buttons>
+      <slot name="side-toolbar-buttons"></slot>
     </template>
   </DataTable>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import DataTable from '../../DataTable.vue'
+import DataTableComponent from '../../DataTable.vue'
 import { convertHandsontableColumns, type HandsontableColumn } from './column-helpers'
 import type { ColumnDef } from '@tanstack/vue-table'
 
@@ -36,7 +44,12 @@ const props = defineProps<{
   loadingState?: boolean
   tableSettings?: Record<string, any>
   cellRenderers?: Record<string, (value: any, row: any) => string>
-  toolbarConfig?: Record<string, any>
+  toolbarConfig?: {
+    useSideToolbar?: boolean
+    isEditable?: boolean
+    exportFilename?: string
+    [key: string]: any
+  }
 }>()
 
 const emit = defineEmits<{
@@ -44,6 +57,8 @@ const emit = defineEmits<{
   'change': [changes: any[]];
   'selection': [selectedRows: any[]];
   'delete-request': [rowData: any[]];
+  'export': [format: string, data: any[], columns: any[]];
+  'toggle-readonly': [];
 }>()
 
 // Détermine quelles données utiliser (format Handsontable ou TanStack)
@@ -89,6 +104,16 @@ function handleSelection(rows: any[]) {
 // Gestion de la demande de suppression
 function handleDeleteRequest(rows: any[]) {
   emit('delete-request', rows)
+}
+
+// Gestion de l'export
+function handleExport(format: string, data: any[], columns: any[]) {
+  emit('export', format, data, columns)
+}
+
+// Gestion du toggle de mode édition
+function handleToggleReadOnly() {
+  emit('toggle-readonly')
 }
 
 // Surveillance des changements de données

@@ -1,385 +1,214 @@
 <template>
-  <div>
-    <!-- Barre d'outils -->
-    <div class="flex items-center justify-between py-4">
-      <div class="flex items-center gap-2">
-        <!-- Champ de recherche -->
-        <Input
-          v-if="searchable"
-          class="max-w-sm"
-          placeholder="Rechercher..."
-          :model-value="searchQuery"
-          @update:model-value="handleSearchUpdate"
-        />
-        
+  <div @keydown="handleKeyDown" @keyup="handleKeyUp" tabindex="0" class="outline-none datatable-wrapper" :class="{
+    'full-width-container': state.isFullWidth.value,
+    'datatable-edit-mode': isEditMode
+  }">
+    <!-- Barre d'outils latérale -->
+    <DataTableSideToolbar v-if="sideToolbar" :table="table" :column-pinning-enabled="!!columnPinning"
+      :is-full-width="state.isFullWidth.value" :is-editable-table="isEditable" :read-only="state.readOnly.value"
+      :export-filename="exportFilename" @export="handleExport" @toggle-readonly="handleToggleReadOnly"
+      @toggle-fullwidth="state.toggleFullWidth()" @toggle-keyboard-help="state.toggleKeyboardShortcutsHelp()"
+      @pin-mode="pinning.toggleColumnPinning()">
+      <template #additional-buttons>
+        <slot name="side-toolbar-buttons"></slot>
+      </template>
+    </DataTableSideToolbar>
+
+    <!-- Barre d'outils principale -->
+    <TableToolbar :table="table" :searchable="searchable" :searchQuery="state.searchQuery.value"
+      :handleSearchUpdate="search.handleSearchUpdate" :pagination="pagination"
+      :pageSize="state.paginationState.value.pageSize" :pageSizeOptions="state.pageSizeOptions.value"
+      :setPageSize="tablePagination.setPageSize" :isFullWidth="state.isFullWidth.value" :isEditMode="!!isEditMode"
+      :sideToolbar="sideToolbar" :columnToggle="columnToggle">
+      <template #toolbar-start>
         <slot name="toolbar-start"></slot>
-      </div>
-      
-      <div class="flex items-center gap-2">
+      </template>
+      <template #toolbar-end>
         <slot name="toolbar-end"></slot>
-        
-        <!-- Bouton pour désépingler toutes les colonnes -->
-        <Button 
-          v-if="columnPinning && columnPinning.left && columnPinning.left.length > 0" 
-          variant="outline" 
-          size="sm"
-          @click="unpinAllColumns"
-        >
-          <PinOff class="w-4 h-4 mr-2" />
-          Désépingler tout
-        </Button>
-        
-        <!-- Sélecteur du nombre de lignes par page -->
-        <div v-if="pagination" class="flex items-center mr-2">
-          <Select
-            :model-value="String(paginationState.pageSize)"
-            @update:model-value="(value) => paginationState.pageSize = Number(value)"
-          >
-            <SelectTrigger class="h-8 w-[70px]">
-              <SelectValue placeholder="10" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem 
-                v-for="pageSize in pageSizeOptions" 
-                :key="pageSize" 
-                :value="String(pageSize)"
-              >
-                {{ pageSize }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <span class="ml-2 text-sm text-muted-foreground">lignes par page</span>
-        </div>
-        
-        <!-- Sélecteur de colonnes visibles -->
-        <DropdownMenu v-if="columnToggle">
-          <DropdownMenuTrigger as-child>
-            <Button variant="outline" size="sm">
-              Colonnes
-              <ChevronDown class="w-4 h-4 ml-2" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" class="w-[200px] max-h-[400px] overflow-y-auto">
-            <DropdownMenuCheckboxItem
-              v-for="column in table.getAllColumns().filter((column) => column.getCanHide())"
-              :key="column.id"
-              class="capitalize"
-              :checked="column.getIsVisible()"
-              @select="column.toggleVisibility(!column.getIsVisible())"
-            >
-              {{ column.columnDef.header?.toString() || column.id }}
-            </DropdownMenuCheckboxItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </div>
+      </template>
+    </TableToolbar>
 
     <!-- Table -->
-    <div class="rounded-md border overflow-auto">
+    <div class="rounded-md border overflow-auto" :class="{ 'datatable-container': !state.isFullWidth.value }">
+      <!-- Bandeau d'édition -->
+      <div v-if="isEditMode"
+        class="p-2 bg-amber-50 border-b border-amber-200 text-amber-800 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-200 flex items-center justify-between">
+        <div class="text-sm">
+          <span class="font-medium">Mode édition :</span> Cliquez sur les cellules pour les modifier
+          <span v-if="state.pendingChanges.value.length > 0"
+            class="ml-2 bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-100 px-2 py-0.5 rounded text-xs">
+            {{ state.pendingChanges.value.length }} modification{{ state.pendingChanges.value.length > 1 ? 's' : '' }}
+          </span>
+        </div>
+        <div class="flex gap-2">
+          <Button size="sm" variant="outline"
+            class="text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900 dark:hover:text-green-300"
+            @click="editing.saveChanges()" :disabled="state.pendingChanges.value.length === 0">
+            <Save class="w-4 h-4 mr-1" />
+            Enregistrer
+          </Button>
+          <Button size="sm" variant="outline"
+            class="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900 dark:hover:text-red-300"
+            @click="editing.cancelChanges()" :disabled="state.pendingChanges.value.length === 0">
+            <X class="w-4 h-4 mr-1" />
+            Annuler
+          </Button>
+        </div>
+      </div>
+
+      <!-- Indicateurs de touches actives -->
+      <div
+        v-if="(state.isShiftKeyPressed.value || state.isCtrlKeyPressed.value || state.isMetaKeyPressed.value) && !isEditMode"
+        class="flex items-center gap-2 p-1 bg-gray-100 dark:bg-gray-800 text-xs">
+        <span v-if="state.isShiftKeyPressed.value"
+          class="px-2 py-0.5 rounded bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+          Shift
+        </span>
+        <span v-if="state.isCtrlKeyPressed.value"
+          class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+          Ctrl
+        </span>
+        <span v-if="state.isMetaKeyPressed.value"
+          class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+          Cmd
+        </span>
+        <span class="text-muted-foreground">Mode sélection multiple actif</span>
+      </div>
+
       <Table :class="[
         tableSettings?.height ? 'max-h-[' + tableSettings.height + ']' : '',
         'fixed-width-table',
-        (columnPinning && (columnPinning.left?.length || columnPinning.right?.length)) ? 'has-pinned-columns' : ''
-      ]" 
-      :table-layout="props.tableLayout || 'fixed'">
-        <TableHeader>
-          <TableRow 
-            v-for="headerGroup in table.getHeaderGroups()" 
-            :key="headerGroup.id"
-            :class="tableSettings?.headerRowClass || ''"
-          >
-            <TableHead 
-              v-for="header in headerGroup.headers" 
-              :key="header.id"
-              :class="[
-                'text-xs font-medium fixed-width-cell group', 
-                tableSettings?.headerCellClass || '',
-                header.column.getCanSort() ? 'cursor-pointer select-none' : '',
-                header.column.getIsPinned() === 'left' ? 'sticky left-0 bg-background border-r pinned-left' : '',
-                header.column.getIsPinned() === 'right' ? 'sticky right-0 bg-background border-l pinned-right' : ''
-              ]"
-              :style="getColumnHeaderStyle(header)"
-              @click="header.column.getCanSort() ? header.column.toggleSorting() : null"
-            >
-              <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                  <FlexRender
-                    v-if="!header.isPlaceholder"
-                    :render="header.column.columnDef.header"
-                    :props="header.getContext()"
-                  />
-                </div>
-                <div class="flex items-center space-x-1">
-                  <div v-if="header.column.getCanSort()" class="ml-1">
-                    <ChevronUp
-                      v-if="header.column.getIsSorted() === 'asc'"
-                      class="h-4 w-4 text-muted-foreground"
-                    />
-                    <ChevronDown
-                      v-else-if="header.column.getIsSorted() === 'desc'"
-                      class="h-4 w-4 text-muted-foreground"
-                    />
-                    <ChevronsUpDown
-                      v-else
-                      class="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100"
-                    />
-                  </div>
-                  
-                  <!-- Boutons d'épinglage des colonnes -->
-                  <template v-if="columnPinning">
-                    <template v-if="header.column.getIsPinned() === 'left'">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        class="h-6 w-6 p-0"
-                        @click.stop="() => unpinColumn(header.column.id, 'left')"
-                        title="Désépingler cette colonne"
-                      >
-                        <PinOff class="h-3.5 w-3.5" />
-                      </Button>
-                    </template>
-                    <template v-else>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        class="h-6 w-6 p-0"
-                        @click.stop="() => pinColumnToLeft(header.column.id)"
-                        title="Épingler cette colonne"
-                      >
-                        <Pin class="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
-                      </Button>
-                    </template>
-                  </template>
-                </div>
-              </div>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <template v-if="loadingState || !safeData.length">
-            <TableRow>
-              <TableCell :colspan="safeColumns.length" class="h-24 text-center">
-                <div class="flex justify-center items-center">
-                  <div v-if="loadingState" class="loading-spinner mr-2"></div>
-                  {{ loadingState ? 'Chargement...' : 'Aucune donnée disponible' }}
-                </div>
-              </TableCell>
-            </TableRow>
-          </template>
-          <template v-else-if="table.getRowModel().rows?.length">
-            <TableRow
-              v-for="row in table.getRowModel().rows"
-              :key="row.id"
-              :data-state="row.getIsSelected() ? 'selected' : undefined"
-              @click="row.toggleSelected()"
-              class="cursor-pointer"
-              :class="[
-                tableSettings?.rowHeights ? `h-[${tableSettings.rowHeights}px]` : '',
-                tableSettings?.currentRowClassName && row.getIsSelected() ? tableSettings.currentRowClassName : '',
-                tableSettings?.rowClass || ''
-              ]"
-            >
-              <TableCell 
-                v-for="cell in row.getVisibleCells()" 
-                :key="cell.id"
-                :class="[
-                  'p-2 align-middle fixed-width-cell',
-                  tableSettings?.cellClass || '',
-                  tableSettings?.currentColClassName && cell.column.getIsVisible() ? tableSettings.currentColClassName : '',
-                  cell.column.getIsPinned() === 'left' ? 'sticky left-0 bg-background border-r pinned-left' : '',
-                  cell.column.getIsPinned() === 'right' ? 'sticky right-0 bg-background border-l pinned-right' : ''
-                ]"
-                :style="getColumnCellStyle(cell)"
-              >
-                <FlexRender 
-                  :render="cell.column.columnDef.cell" 
-                  :props="cell.getContext()" 
-                />
-              </TableCell>
-            </TableRow>
-          </template>
-          <template v-else>
-            <TableRow>
-              <TableCell :colspan="safeColumns.length" class="h-24 text-center">
-                Aucun résultat.
-              </TableCell>
-            </TableRow>
-          </template>
-        </TableBody>
+        (columnPinning && (state.columnPinning.value.left?.length)) ? 'has-pinned-columns' : ''
+      ]" :table-layout="props.tableLayout || 'fixed'">
+        <!-- En-tête du tableau -->
+        <TableHeader :table="table" :tableSettings="tableSettings" :columnPinning="columnPinning"
+          :pinColumnToLeft="pinning.pinColumnToLeft" :unpinColumn="pinning.unpinColumn"
+          :getColumnHeaderStyle="pinning.getColumnHeaderStyle" />
+
+        <!-- Corps du tableau -->
+        <TableBody :table="table" :columns="state.safeColumns.value" :data="state.safeData.value"
+          :loadingState="loadingState" :isEditMode="!!isEditMode" :tableSettings="tableSettings"
+          :displayedRows="tablePagination.displayedRows.value" :handleRowClick="selection.handleRowClick"
+          :getColumnCellStyle="pinning.getColumnCellStyle" />
       </Table>
     </div>
-    
+
     <!-- Pagination -->
-    <div class="flex items-center justify-between py-4" v-if="pagination && table.getRowModel().rows?.length > 0">
-      <div class="flex-1 text-sm text-muted-foreground">
-        {{ table.getFilteredSelectedRowModel().rows.length }} sur {{ table.getFilteredRowModel().rows.length }} ligne(s) sélectionnée(s)
-      </div>
-      <div class="flex items-center space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          :disabled="!table.getCanPreviousPage()"
-          @click="table.previousPage()"
-        >
-          Précédent
-        </Button>
-        <div class="flex items-center space-x-1">
-          <span class="text-sm">Page {{ table.getState().pagination.pageIndex + 1 }} sur {{ table.getPageCount() }}</span>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          :disabled="!table.getCanNextPage()"
-          @click="table.nextPage()"
-        >
-          Suivant
-        </Button>
-      </div>
-    </div>
+    <TablePagination v-if="pagination && table.getRowModel().rows?.length > 0" :table="table"
+      :pageIndex="state.paginationState.value.pageIndex" :totalPages="tablePagination.totalPages.value"
+      :goToPreviousPage="tablePagination.goToPreviousPage" :goToNextPage="tablePagination.goToNextPage" />
+
+    <!-- Boîte de dialogue d'aide pour les raccourcis clavier -->
+    <KeyboardShortcutsHelp v-model:visible="state.keyboardShortcutsHelpVisible.value" />
   </div>
 </template>
 
 <script setup lang="ts" generic="TData">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import {
   FlexRender,
   getCoreRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   getFilteredRowModel,
-  useVueTable,
-  type ColumnDef,
-  type SortingState,
-  type ColumnFiltersState,
-  type VisibilityState,
-  type PaginationState,
-  type ColumnPinningState
+  useVueTable
 } from '@tanstack/vue-table'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { ChevronDown, ChevronUp, ChevronsUpDown, Pin, PinOff } from 'lucide-vue-next'
-import { valueUpdater } from './utils/tanstack/column-helpers'
+import { Table } from '@/components/ui/table'
+import { Save, X } from 'lucide-vue-next'
+import DataTableSideToolbar from './utils/tanstack/DataTableSideToolbar.vue'
+
+// Composants refactorisés
+import TableHeader from './components/TableHeader.vue'
+import TableBody from './components/TableBody.vue'
+import TablePagination from './components/TablePagination.vue'
+import TableToolbar from './components/TableToolbar.vue'
+import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp.vue'
+
+// Composables
+import { useTableState } from './composables/useTableState'
+import { useTablePinning } from './composables/useTablePinning'
+import { useTableSelection } from './composables/useTableSelection'
+import { useTableEditing } from './composables/useTableEditing'
+import { useTablePagination } from './composables/useTablePagination'
+import { useTableSearch } from './composables/useTableSearch'
+import { useTableExport } from './composables/useTableExport'
+
+// Types
+import type { DataTableProps, DataTableEmits } from './types/table-types'
+import type { Table as TableType } from '@tanstack/vue-table'
 
 // Props du composant
-const props = defineProps<{
-  columns: ColumnDef<TData, any>[] // Définitions des colonnes
-  data: TData[] // Données
-  loadingState?: boolean // État de chargement
-  pagination?: boolean // Activer la pagination
-  searchable?: boolean // Activer la recherche
-  searchField?: string // Champ sur lequel effectuer la recherche
-  columnToggle?: boolean // Permettre de masquer/afficher les colonnes
-  columnPinning?: boolean // Permettre d'épingler les colonnes
-  rowSelection?: boolean // Permettre la sélection des lignes
-  tableSettings?: Record<string, any> // Paramètres supplémentaires pour le tableau
-  tableLayout?: 'auto' | 'fixed' // Disposition de la table
-  pageSizes?: number[] // Tailles de page disponibles
-}>()
+const props = defineProps<DataTableProps<TData>>()
 
 // Évènements émis
-const emit = defineEmits<{
-  selection: [selectedRows: TData[]]
-  'change': [changes: any]
-  'delete-request': [rows: TData[]]
-}>()
+const emit = defineEmits<DataTableEmits<TData>>()
 
-// Options de taille de page par défaut
-const pageSizeOptions = computed(() => 
-  props.pageSizes || [10, 25, 50, 100, 500]
-)
+// Initialiser l'état global
+const state = useTableState<TData>(props)
 
-// S'assurer que data est toujours un tableau
-const safeData = computed<TData[]>(() => {
-  return Array.isArray(props.data) ? props.data : []
-})
+// Computed pour le mode édition
+const isEditMode = computed(() => state.isEditMode.value)
 
-// S'assurer que columns est toujours un tableau
-const safeColumns = computed<ColumnDef<TData, any>[]>(() => {
-  return Array.isArray(props.columns) ? props.columns : []
-})
+// Création d'un type pour la métadonnée de la table pour éviter la référence circulaire
+const tableMeta = {
+  isEditMode: props.isEditable,
+  pendingChanges: state.pendingChanges.value,
+  handleCellChange: (rowId: string, columnId: string, value: any) => {
+    // Cette fonction sera mise à jour après l'initialisation de la table
+  },
+  activeCell: null as { rowId: string; columnId: string } | null,
+  setActiveCell: (rowId: string, columnId: string) => {
+    if (tableMeta) {
+      tableMeta.activeCell = { rowId, columnId };
+    }
+  },
+}
 
-// États locaux
-const sorting = ref<SortingState>([])
-const columnFilters = ref<ColumnFiltersState>([])
-const columnVisibility = ref<VisibilityState>({})
-const rowSelectionState = ref({})
-const columnPinning = ref<ColumnPinningState>({
-  left: [],
-  right: []
-})
-const paginationState = ref<PaginationState>({
-  pageIndex: 0,
-  pageSize: pageSizeOptions.value[0] || 10,
-})
-const searchQuery = ref('')
-
-// Configuration de la table avec gestion des erreurs
-const table = useVueTable({
-  get data() { 
+// Configuration de la table avec gestion des erreurs et des états
+const table = useVueTable<TData>({
+  get data() {
     try {
-      return safeData.value
+      return state.safeData.value
     } catch (e) {
       console.error("Erreur lors de l'accès aux données :", e)
       return []
     }
   },
-  get columns() { 
+  get columns() {
     try {
-      return safeColumns.value
+      return state.safeColumns.value
     } catch (e) {
       console.error("Erreur lors de l'accès aux colonnes :", e)
       return []
     }
   },
-  onSortingChange: (updaterOrValue) => valueUpdater(updaterOrValue, sorting),
-  onColumnFiltersChange: (updaterOrValue) => valueUpdater(updaterOrValue, columnFilters),
-  onColumnVisibilityChange: (updaterOrValue) => valueUpdater(updaterOrValue, columnVisibility),
-  onRowSelectionChange: (updaterOrValue) => valueUpdater(updaterOrValue, rowSelectionState),
-  onColumnPinningChange: (updaterOrValue) => valueUpdater(updaterOrValue, columnPinning),
-  onPaginationChange: (updaterOrValue) => valueUpdater(updaterOrValue, paginationState),
+  onSortingChange: (updaterOrValue) => state.valueUpdater(updaterOrValue, state.sorting),
+  onColumnFiltersChange: (updaterOrValue) => state.valueUpdater(updaterOrValue, state.columnFilters),
+  onColumnVisibilityChange: (updaterOrValue) => state.valueUpdater(updaterOrValue, state.columnVisibility),
+  onRowSelectionChange: (updaterOrValue) => state.valueUpdater(updaterOrValue, state.rowSelectionState),
+  onColumnPinningChange: (updaterOrValue) => state.valueUpdater(updaterOrValue, state.columnPinning),
+  onPaginationChange: (updaterOrValue) => state.valueUpdater(updaterOrValue, state.paginationState),
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
   getFilteredRowModel: getFilteredRowModel(),
-  getPaginationRowModel: props.pagination ? getPaginationRowModel() : undefined,
+  getPaginationRowModel: undefined,
   state: {
-    get sorting() { return sorting.value },
-    get columnFilters() { return columnFilters.value },
-    get columnVisibility() { return columnVisibility.value },
-    get rowSelection() { return rowSelectionState.value },
-    get columnPinning() { 
-      console.log('Récupération de l\'état d\'épinglage dans la config de table:', JSON.stringify(columnPinning.value))
-      return columnPinning.value 
-    },
-    get pagination() { return props.pagination ? paginationState.value : undefined },
+    get sorting() { return state.sorting.value },
+    get columnFilters() { return state.columnFilters.value },
+    get columnVisibility() { return state.columnVisibility.value },
+    get rowSelection() { return state.rowSelectionState.value },
+    get columnPinning() { return state.columnPinning.value },
+    get pagination() { return props.pagination ? state.paginationState.value : undefined },
   },
-  enableRowSelection: props.rowSelection,
-  enableMultiRowSelection: props.rowSelection,
+  meta: tableMeta,
+  enableRowSelection: props.rowSelection && !isEditMode.value, // Désactiver la sélection en mode édition
+  enableMultiRowSelection: props.rowSelection && !isEditMode.value,
   enableColumnPinning: props.columnPinning,
-  debugTable: true,
-  debugHeaders: true,
-  debugColumns: true,
+  debugTable: false,
+  debugHeaders: false,
+  debugColumns: false,
   getRowId: (row: any) => {
     // Tenter d'utiliser une clé primaire commune
     for (const key of ['id', 'ID', '_id', 'uuid', 'key']) {
@@ -387,169 +216,170 @@ const table = useVueTable({
         return String(row[key])
       }
     }
-    
-    // Sinon, utiliser JSON.stringify comme fallback - attention aux performances
-    try {
-      return JSON.stringify(row)
-    } catch (e) {
-      console.error("Erreur lors de la création d'un ID de ligne :", e)
-      return Math.random().toString(36).substring(2)
-    }
+
+    // Sinon, utiliser JSON.stringify comme fallback
+    return JSON.stringify(row)
   },
 })
 
-// Fonction de gestion du changement de la valeur de recherche
-const handleSearchUpdate = (value: string | number) => {
-  const stringValue = String(value)
-  handleSearch(stringValue)
+// Mettre à jour les fonctions de métadonnées qui ont besoin d'accéder à la table
+tableMeta.handleCellChange = (rowId: string, columnId: string, value: any) => {
+  editing.handleCellChange(rowId, columnId, value)
 }
 
-// Fonction de recherche
-const handleSearch = (value: string) => {
-  searchQuery.value = value
-  
-  if (props.searchField) {
-    table.getColumn(props.searchField)?.setFilterValue(value)
-  } else {
-    // Si aucun champ de recherche spécifié, on cherche dans toutes les colonnes
-    // Cette partie est à implémenter si besoin
-  }
-}
+// Initialiser les autres composables avec la table et l'état
+const pinning = useTablePinning<TData>(table, state.columnPinning)
+const selection = useTableSelection<TData>(
+  table,
+  state.rowSelectionState,
+  state.lastSelectedRowIndex,
+  state.isShiftKeyPressed,
+  state.isCtrlKeyPressed,
+  state.isMetaKeyPressed,
+  emit
+)
+const editing = useTableEditing<TData>(table, state.readOnly, state.pendingChanges, props, emit)
+const tablePagination = useTablePagination<TData>(table, state.paginationState, state.safeData)
+const search = useTableSearch<TData>(table, props)
+const exporter = useTableExport<TData>(table, emit)
 
-// Méthodes utilitaires pour gérer les styles des colonnes épinglées
-const getColumnHeaderStyle = (header: any) => {
-  const baseStyle = header.column.columnDef.size 
-    ? `width: ${header.column.columnDef.size}px !important; min-width: ${header.column.columnDef.size}px !important; max-width: ${header.column.columnDef.size}px !important;` 
-    : '';
-    
-  if (header.column.getIsPinned() === 'left') {
-    return `${baseStyle} left: ${header.column.getStart('left')}px;`;
-  }
-  
-  if (header.column.getIsPinned() === 'right') {
-    return `${baseStyle} right: ${header.column.getAfter('right')}px;`;
-  }
-  
-  return baseStyle;
-}
+// Handler pour la gestion des raccourcis clavier
+const handleKeyDown = selection.handleKeyDown
+const handleKeyUp = selection.handleKeyUp
 
-const getColumnCellStyle = (cell: any) => {
-  const baseStyle = cell.column.columnDef.size 
-    ? `width: ${cell.column.columnDef.size}px !important; min-width: ${cell.column.columnDef.size}px !important; max-width: ${cell.column.columnDef.size}px !important;` 
-    : '';
-    
-  if (cell.column.getIsPinned() === 'left') {
-    return `${baseStyle} left: ${cell.column.getStart('left')}px;`;
-  }
-  
-  if (cell.column.getIsPinned() === 'right') {
-    return `${baseStyle} right: ${cell.column.getAfter('right')}px;`;
-  }
-  
-  return baseStyle;
-}
+// Handler pour l'export
+const handleExport = exporter.handleExport
 
-// Méthode utilitaire pour forcer la mise à jour de l'épinglage après manipulation
-const forceUpdatePinning = () => {
-  // Déclencher un événement de mise à jour pour s'assurer que les changements sont appliqués
-  setTimeout(() => {
-    console.log('Mise à jour forcée de l\'affichage des colonnes épinglées')
-    table.setColumnPinning({ ...columnPinning.value })
-  }, 0)
-}
-
-// Méthodes pour gérer les colonnes épinglées
-const pinColumnToLeft = (columnId: string) => {
-  console.log('Épingler à gauche:', columnId, 'État actuel:', JSON.stringify(columnPinning.value))
-  const currentLeft = columnPinning.value.left || []
-  
-  // Ajouter à 'left' seulement si elle n'y est pas déjà
-  const newLeft = currentLeft.includes(columnId) ? currentLeft : [...currentLeft, columnId]
-  
-  const newPinningState = {
-    left: newLeft,
-    right: []  // On ne garde aucune colonne épinglée à droite
-  }
-  
-  console.log('Nouvel état d\'épinglage:', JSON.stringify(newPinningState))
-  table.setColumnPinning(newPinningState)
-  // Mettre à jour directement l'état local pour s'assurer qu'il est synchronisé
-  columnPinning.value = newPinningState
-  forceUpdatePinning()
-}
-
-const unpinColumn = (columnId: string, side: 'left' | 'right') => {
-  console.log('Désépingler:', columnId, 'du côté:', side, 'État actuel:', JSON.stringify(columnPinning.value))
-  const currentLeft = columnPinning.value.left || []
-  
-  const newPinningState = {
-    left: side === 'left' ? currentLeft.filter(id => id !== columnId) : currentLeft,
-    right: []  // On ne garde aucune colonne épinglée à droite
-  }
-  
-  console.log('Nouvel état d\'épinglage après désépinglage:', JSON.stringify(newPinningState))
-  table.setColumnPinning(newPinningState)
-  // Mettre à jour directement l'état local pour s'assurer qu'il est synchronisé
-  columnPinning.value = newPinningState
-  forceUpdatePinning()
-}
-
-// Méthode pour désépingler toutes les colonnes
-const unpinAllColumns = () => {
-  console.log('Désépingler toutes les colonnes')
-  const newPinningState = {
-    left: [],
-    right: []
-  }
-  
-  table.setColumnPinning(newPinningState)
-  // Mettre à jour directement l'état local pour s'assurer qu'il est synchronisé
-  columnPinning.value = newPinningState
-  forceUpdatePinning()
-}
-
-// Émission de la sélection quand elle change
-watch(rowSelectionState, () => {
-  try {
-    const selectedRows = table.getFilteredSelectedRowModel().rows.map(row => row.original)
-    emit('selection', selectedRows)
-  } catch (error) {
-    console.error('Erreur lors de la récupération des lignes sélectionnées:', error)
-    emit('selection', [])
-  }
-})
-
-// Réinitialiser la pagination quand les données changent
-watch(() => safeData.value, () => {
-  if (props.pagination) {
-    paginationState.value.pageIndex = 0
-  }
-}, { deep: false })
-
-// S'assurer que l'état d'épinglage est correctement initialisé
-watch(() => props.columnPinning, (enabled) => {
-  if (!enabled) {
-    // Si l'épinglage est désactivé, réinitialiser l'état
-    columnPinning.value = { left: [], right: [] }
-    table.setColumnPinning({ left: [], right: [] })
-  } else {
-    // Forcer une mise à jour de l'affichage des colonnes épinglées
-    forceUpdatePinning()
-  }
-}, { immediate: true })
+// Handler pour le basculement du mode édition
+const handleToggleReadOnly = editing.handleToggleReadOnly
 
 // Exposer l'instance de la table pour permettre un accès externe
 defineExpose({
   table,
 })
 
-// Surveiller les changements dans l'état d'épinglage des colonnes
-watch(columnPinning, (newVal) => {
-  console.log('État d\'épinglage des colonnes mis à jour:', JSON.stringify(newVal))
-}, { deep: true })
+// Initialisation au montage du composant
+onMounted(() => {
+  // Initialiser à partir du localStorage
+  state.initFromLocalStorage()
+
+  // Configurer les écouteurs d'événements pour les raccourcis clavier
+  selection.setupKeyboardListeners()
+
+  // Forcer une mise à jour de l'affichage des colonnes épinglées
+  if (props.columnPinning) {
+    state.forceUpdatePinning(table)
+  }
+
+  // Configurer l'éditeur si nécessaire
+  if (props.isEditable) {
+    editing.setupEditingKeyboardListeners()
+  }
+})
+
+// Nettoyage des écouteurs d'événements
+onUnmounted(() => {
+  selection.cleanupKeyboardListeners()
+
+  if (props.isEditable) {
+    editing.cleanupEditingKeyboardListeners()
+  }
+})
 </script>
 
 <style scoped>
+/* Wrapper de la table avec positionnement relatif pour la barre d'outils latérale */
+.datatable-wrapper {
+  position: relative;
+  padding-left: 0.5rem;
+  /* Espace à gauche pour la barre d'outils latérale */
+}
+
+/* Mode pleine largeur */
+.full-width-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  padding: 1rem;
+  overflow: auto;
+  transition: all 0.3s ease;
+}
+
+/* Overlay semi-transparent pour le fond */
+.full-width-container::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: -1;
+  backdrop-filter: blur(2px);
+}
+
+.dark .full-width-container::before {
+  background-color: rgba(0, 0, 0, 0.85);
+}
+
+/* Style pour la barre d'outils en mode pleine largeur */
+.toolbar-fullwidth {
+  background-color: var(--background, white);
+  border-radius: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.dark .toolbar-fullwidth {
+  background-color: var(--background, #020617);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Conteneur du tableau avec effet d'élévation */
+.full-width-container :deep(.rounded-md.border) {
+  background-color: var(--background, white);
+  border-radius: 0.5rem;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.dark .full-width-container :deep(.rounded-md.border) {
+  background-color: var(--background, #020617);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+}
+
+/* S'assurer que le tableau prend toute la hauteur disponible en mode pleine largeur */
+.full-width-container :deep(.fixed-width-table) {
+  height: calc(100vh - 170px) !important;
+  max-height: none !important;
+  overflow: auto;
+}
+
+/* Ajouter une animation de transition pour un basculement fluide */
+:deep(.fixed-width-table) {
+  transition: all 0.3s ease;
+}
+
+/* Assurer que la pagination est également bien visible en mode pleine largeur */
+.full-width-container>.flex.items-center.justify-between.py-4:last-child {
+  background-color: var(--background, white);
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.dark .full-width-container>.flex.items-center.justify-between.py-4:last-child {
+  background-color: var(--background, #020617);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5);
+}
+
 .loading-spinner {
   display: inline-block;
   width: 1rem;
@@ -561,7 +391,9 @@ watch(columnPinning, (newVal) => {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 :global(.cursor-pointer) {
@@ -569,13 +401,24 @@ watch(columnPinning, (newVal) => {
 }
 
 :global([data-state="selected"]) {
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: rgba(34, 197, 94, 0.1) !important;
+}
+
+:global([data-state="selected"] td) {
+  background-color: rgba(34, 197, 94, 0.1) !important;
+}
+
+.dark :global([data-state="selected"]),
+.dark :global([data-state="selected"] td) {
+  background-color: rgba(34, 197, 94, 0.2) !important;
 }
 
 /* Styles pour la table à largeur fixe */
 :deep(.fixed-width-table) {
   width: auto !important;
   table-layout: fixed !important;
+  font-size: 0.75rem !important;
+  /* text-xs équivalent */
 }
 
 :deep(.fixed-width-table thead tr),
@@ -589,6 +432,8 @@ watch(columnPinning, (newVal) => {
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
+  font-size: 0.75rem !important;
+  /* text-xs équivalent */
 }
 
 /* Empêcher le redimensionnement automatique */
@@ -596,6 +441,8 @@ watch(columnPinning, (newVal) => {
 :deep(td) {
   box-sizing: border-box !important;
   white-space: nowrap !important;
+  padding: 0.25rem 0.5rem !important;
+  /* p-1 équivalent */
 }
 
 /* Styles pour le contenu des cellules */
@@ -604,6 +451,8 @@ watch(columnPinning, (newVal) => {
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
+  font-size: 0.75rem !important;
+  /* text-xs équivalent */
 }
 
 /* Styles pour les colonnes épinglées */
@@ -628,35 +477,29 @@ watch(columnPinning, (newVal) => {
   box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
   left: 0;
   z-index: 2;
-  background-color: var(--background, white) !important;
-  backdrop-filter: blur(4px);
-}
-
-:deep(thead th.sticky.right-0),
-:deep(tbody td.sticky.right-0) {
-  box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1);
-  right: 0;
-  z-index: 2;
-  background-color: var(--background, white) !important;
   backdrop-filter: blur(4px);
 }
 
 /* Assurer que le header des colonnes épinglées est plus visible */
 :deep(thead th.sticky) {
   z-index: 3 !important;
-  background-color: var(--background, white) !important;
+  background-color: var(--gray-500, #6b7280) !important;
+  color: white !important;
+}
+
+.dark :deep(thead th.sticky) {
+  background-color: var(--gray-800, #1f2937) !important;
+  color: var(--gray-200, #e5e7eb) !important;
 }
 
 /* Style pour les colonnes épinglées en mode sombre */
-.dark :deep(thead th.sticky),
 .dark :deep(tbody td.sticky) {
-  background-color: var(--background, #1f2937) !important;
+  background-color: inherit !important;
 }
 
 /* Styles spécifiques pour mieux visualiser les colonnes épinglées */
 :deep(.pinned-left),
 :deep(.pinned-right) {
-  background-color: var(--background, white) !important;
   position: relative;
 }
 
@@ -668,21 +511,21 @@ watch(columnPinning, (newVal) => {
   top: 0;
   bottom: 0;
   width: 100%;
-  background-color: rgba(59, 130, 246, 0.05);
+  background-color: rgba(34, 197, 94, 0.05);
   pointer-events: none;
 }
 
 .dark :deep(.pinned-left)::after,
 .dark :deep(.pinned-right)::after {
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: rgba(34, 197, 94, 0.1);
 }
 
 :deep(.pinned-left) {
-  border-right: 2px solid var(--primary, #3b82f6) !important;
+  border-right: 2px solid var(--green-500, #22c55e) !important;
 }
 
 :deep(.pinned-right) {
-  border-left: 2px solid var(--primary, #3b82f6) !important;
+  border-left: 2px solid var(--green-500, #22c55e) !important;
 }
 
 /* Ajuster le curseur pour indiquer que les colonnes épinglées sont spéciales */
@@ -693,8 +536,13 @@ watch(columnPinning, (newVal) => {
 
 /* Animation pour les colonnes nouvellement épinglées */
 @keyframes highlight-pinned {
-  0% { background-color: rgba(59, 130, 246, 0.2); }
-  100% { background-color: rgba(59, 130, 246, 0.05); }
+  0% {
+    background-color: rgba(59, 130, 246, 0.2);
+  }
+
+  100% {
+    background-color: rgba(59, 130, 246, 0.05);
+  }
 }
 
 :deep(.pinned-left)::after {
@@ -710,5 +558,115 @@ watch(columnPinning, (newVal) => {
 
 :deep(th:hover .h-3\.5.w-3\.5:hover) {
   transform: scale(1.2);
+}
+
+/* Assurer que les colonnes épinglées respectent le style alterné des lignes */
+:deep(tbody tr:nth-child(even) td.sticky) {
+  background-color: var(--white, white) !important;
+}
+
+:deep(tbody tr:nth-child(odd) td.sticky) {
+  background-color: var(--gray-50, #f9fafb) !important;
+}
+
+.dark :deep(tbody tr:nth-child(even) td.sticky) {
+  background-color: var(--gray-950, #030712) !important;
+}
+
+.dark :deep(tbody tr:nth-child(odd) td.sticky) {
+  background-color: var(--gray-900, #111827) !important;
+}
+
+/* Assurer que les colonnes épinglées respectent la sélection */
+:deep(tbody tr[data-state="selected"] td),
+:deep(tbody tr[data-state="selected"] td.sticky) {
+  background-color: rgba(34, 197, 94, 0.1) !important;
+}
+
+.dark :deep(tbody tr[data-state="selected"] td),
+.dark :deep(tbody tr[data-state="selected"] td.sticky) {
+  background-color: rgba(34, 197, 94, 0.2) !important;
+}
+
+/* Réduire la hauteur des lignes pour un tableau plus compact */
+:deep(tbody tr) {
+  height: 28px !important;
+  /* Hauteur réduite pour les lignes */
+}
+
+:deep(thead tr) {
+  height: 32px !important;
+  /* Hauteur légèrement plus grande pour l'en-tête */
+}
+
+/* Réduire l'espacement vertical dans les cellules */
+:deep(td),
+:deep(th) {
+  padding-top: 0.125rem !important;
+  /* py-0.5 équivalent */
+  padding-bottom: 0.125rem !important;
+}
+
+/* Styles pour le tableau en mode normal avec défilement */
+.datatable-container {
+  max-height: 500px;
+  /* Hauteur maximale en mode normal */
+  overflow: auto;
+}
+
+/* Permettre le défilement du tableau même en mode normal */
+:deep(.fixed-width-table) {
+  width: auto !important;
+  table-layout: fixed !important;
+  font-size: 0.75rem !important;
+  /* text-xs équivalent */
+  overflow: visible;
+  /* Pour permettre au conteneur parent de gérer le défilement */
+}
+
+/* Styles pour le mode édition */
+.datatable-edit-mode .editable-cell {
+  position: relative;
+  cursor: text !important;
+  transition: all 0.2s ease;
+}
+
+.datatable-edit-mode .editable-cell:hover {
+  background-color: rgba(59, 130, 246, 0.05) !important;
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.3);
+}
+
+.datatable-edit-mode .editable-cell::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 6px 6px 0;
+  border-color: transparent rgba(59, 130, 246, 0.3) transparent transparent;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.datatable-edit-mode .editable-cell:hover::after {
+  opacity: 1;
+}
+
+/* Ajuster l'apparence en mode édition */
+.datatable-edit-mode tbody tr:hover {
+  background-color: inherit !important;
+}
+
+/* Style pour les cellules modifiées */
+.datatable-edit-mode .modified-cell {
+  background-color: rgba(250, 204, 21, 0.1) !important;
+  box-shadow: inset 0 0 0 1px rgba(202, 138, 4, 0.5);
+}
+
+.datatable-edit-mode .modified-cell::after {
+  border-color: transparent rgba(202, 138, 4, 0.5) transparent transparent;
+  opacity: 1;
 }
 </style>
