@@ -47,6 +47,7 @@ const emit = defineEmits<{
 }>()
 
 async function handleSearch() {
+    console.log('handleSearch')
     if (!siretNumber.value) return
 
     const result = await searchCompanyBySiret(siretNumber.value)
