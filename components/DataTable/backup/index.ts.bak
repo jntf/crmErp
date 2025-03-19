@@ -1,0 +1,46 @@
+import DataTable from './DataTable.vue'
+import DataTableHand from './DataTableHand.vue'
+import DataTableToolbar from './DataTableToolbar.vue'
+import DataTableAdapter from './utils/tanstack/DataTableAdapter.vue'
+import DataTableSideToolbar from './utils/tanstack/DataTableSideToolbar.vue'
+import { convertHandsontableColumns, valueUpdater } from './utils/tanstack/column-helpers'
+import type { HandsontableColumn } from './utils/tanstack/column-helpers'
+
+// Importation des composables
+import { useTableState } from './composables/useTableState'
+import { useTablePinning } from './composables/useTablePinning'
+import { useTableSelection } from './composables/useTableSelection'
+import { useTableEditing } from './composables/useTableEditing'
+import { useTablePagination } from './composables/useTablePagination'
+import { useTableSearch } from './composables/useTableSearch'
+import { useTableExport } from './composables/useTableExport'
+
+// Exportations nommées des composants et utilitaires
+export {
+    DataTable,
+    DataTableHand,
+    DataTableToolbar,
+    DataTableAdapter,
+    DataTableSideToolbar,
+    convertHandsontableColumns,
+    valueUpdater,
+    // Composables
+    useTableState,
+    useTablePinning,
+    useTableSelection,
+    useTableEditing,
+    useTablePagination,
+    useTableSearch,
+    useTableExport
+}
+
+// Exportation des types
+export type {
+    HandsontableColumn
+}
+
+// Exportation des nouveaux types
+export * from '../types/table-types'
+
+// Pour la rétrocompatibilité, on exporte DataTableAdapter par défaut
+export default DataTableAdapter 

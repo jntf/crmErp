@@ -24,7 +24,8 @@ export default defineNuxtConfig({
     './modules/webStock',
     './modules/entity',
     './modules/stock',
-    './modules/orders'
+    './modules/orders',
+    './modules/contacts-import'
   ],
   shadcn: {
     prefix: '',

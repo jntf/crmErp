@@ -27,6 +27,8 @@
 
         <!-- Table principale -->
         <div class="w-full">
+            <!-- Temporairement commenté l'ancien DataTable pour tester le nouveau -->
+            <!-- 
             <DataTable 
                 :key="searchState.rawQuery"
                 :tableData="filteredVehicles" 
@@ -38,6 +40,18 @@
                 @selection="handleSelection" 
                 @change="handleChange" 
                 @delete-request="handleDeleteRequest" 
+            />
+            -->
+            
+            <!-- Utilisation du nouveau VehicleTable avec les colonnes et données complètes -->
+            <VehicleTable 
+                :dataSource="filteredVehicles"
+                :loading="loading"
+                :column-toggle="true"
+                :column-pinning="true"
+                :pagination="true"
+                @selection="handleSelection"
+                @delete-request="handleDeleteRequest"
             />
         </div>
 
@@ -125,6 +139,7 @@ import { VehicleStatusEnum } from '../types'
 import type { Vehicle, VehicleTableData, VehicleCreate } from '../types'
 import VehicleSearch from '../components/VehicleSearch.vue'
 import VehicleActions from '../components/VehicleActions.vue'
+import VehicleTable from '../components/VehicleTable.vue'
 import StatusUpdateModal from '../components/StatusUpdateModal.vue'
 import CommercialOfferDialog from '../components/CommercialOfferDialog.vue'
 import SupplierSelectionDialog from '../components/SupplierSelectionDialog.vue'

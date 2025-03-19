@@ -1,507 +1,672 @@
-//components/DataTable/DataTable.vue
 <template>
-    <div class="data-table-wrapper">
-        <!-- Toolbar -->
-        <DataTableToolbar 
-            v-if="!loadingState" 
-            :columns="tableColumns || []"
-            :selected-count="selectedItems.length"
-            :visible-columns="visibleColumnIds"
-            :is-read-only="isReadOnly"
-            :data="processedTableData"
-            :filename="toolbarConfig?.exportFileName"
-            @toggleColumn="toggleColumn"
-            @toggleReadOnly="toggleReadOnly"
-            @export="handleExport">
-            <template #actions>
-                <slot name="toolbar-actions" :selectedItems="selectedItems"></slot>
-            </template>
-        </DataTableToolbar>
+  <div @keydown="handleKeyDown" @keyup="handleKeyUp" tabindex="0" class="outline-none datatable-wrapper" :class="{
+    'full-width-container': state.isFullWidth.value,
+    'datatable-edit-mode': isEditMode
+  }">
+    <!-- Barre d'outils latérale -->
+    <DataTableSideToolbar v-if="sideToolbar" :table="table" :column-pinning-enabled="!!columnPinning"
+      :is-full-width="state.isFullWidth.value" :is-editable-table="isEditable" :read-only="state.readOnly.value"
+      :export-filename="exportFilename" @export="handleExport" @toggle-readonly="handleToggleReadOnly"
+      @toggle-fullwidth="state.toggleFullWidth()" @toggle-keyboard-help="state.toggleKeyboardShortcutsHelp()"
+      @pin-mode="pinning.toggleColumnPinning()">
+      <template #additional-buttons>
+        <slot name="side-toolbar-buttons"></slot>
+      </template>
+    </DataTableSideToolbar>
 
-        <!-- Loading state -->
-        <div v-if="loadingState || !isHydrated" class="py-4 text-center">
-            <span class="text-sm text-gray-500">Chargement...</span>
-        </div>
+    <!-- Barre d'outils principale -->
+    <TableToolbar :table="table" :searchable="searchable" :searchQuery="state.searchQuery.value"
+      :handleSearchUpdate="search.handleSearchUpdate" :pagination="pagination"
+      :pageSize="state.paginationState.value.pageSize" :pageSizeOptions="state.pageSizeOptions.value"
+      :setPageSize="tablePagination.setPageSize" :isFullWidth="state.isFullWidth.value" :isEditMode="!!isEditMode"
+      :sideToolbar="sideToolbar" :columnToggle="columnToggle">
+      <template #toolbar-start>
+        <slot name="toolbar-start"></slot>
+      </template>
+      <template #toolbar-end>
+        <slot name="toolbar-end"></slot>
+      </template>
+    </TableToolbar>
 
-        <!-- Table -->
-        <div v-else-if="isHydrated">
-            <HotTable 
-                :data="processedTableData" 
-                :settings="mergedTableSettings" 
-                :rowHeaders="true"
-                :colHeaders="columnHeaders" 
-                :height="tableHeight" 
-                :width="tableWidth" 
-                @afterChange="handleChange"
-                @afterSelection="handleSelection" 
-                class="excel-theme" 
-                ref="hotTableRef" 
-            />
+    <!-- Table -->
+    <div class="rounded-md border overflow-auto" :class="{ 'datatable-container': !state.isFullWidth.value }">
+      <!-- Bandeau d'édition -->
+      <div v-if="isEditMode"
+        class="p-2 bg-amber-50 border-b border-amber-200 text-amber-800 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-200 flex items-center justify-between">
+        <div class="text-sm">
+          <span class="font-medium">Mode édition :</span> Cliquez sur les cellules pour les modifier
+          <span v-if="state.pendingChanges.value.length > 0"
+            class="ml-2 bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-100 px-2 py-0.5 rounded text-xs">
+            {{ state.pendingChanges.value.length }} modification{{ state.pendingChanges.value.length > 1 ? 's' : '' }}
+          </span>
         </div>
+        <div class="flex gap-2">
+          <Button size="sm" variant="outline"
+            class="text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900 dark:hover:text-green-300"
+            @click="editing.saveChanges()" :disabled="state.pendingChanges.value.length === 0">
+            <Save class="w-4 h-4 mr-1" />
+            Enregistrer
+          </Button>
+          <Button size="sm" variant="outline"
+            class="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900 dark:hover:text-red-300"
+            @click="editing.cancelChanges()" :disabled="state.pendingChanges.value.length === 0">
+            <X class="w-4 h-4 mr-1" />
+            Annuler
+          </Button>
+        </div>
+      </div>
+
+      <!-- Indicateurs de touches actives -->
+      <div
+        v-if="(state.isShiftKeyPressed.value || state.isCtrlKeyPressed.value || state.isMetaKeyPressed.value) && !isEditMode"
+        class="flex items-center gap-2 p-1 bg-gray-100 dark:bg-gray-800 text-xs">
+        <span v-if="state.isShiftKeyPressed.value"
+          class="px-2 py-0.5 rounded bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+          Shift
+        </span>
+        <span v-if="state.isCtrlKeyPressed.value"
+          class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+          Ctrl
+        </span>
+        <span v-if="state.isMetaKeyPressed.value"
+          class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+          Cmd
+        </span>
+        <span class="text-muted-foreground">Mode sélection multiple actif</span>
+      </div>
+
+      <Table :class="[
+        tableSettings?.height ? 'max-h-[' + tableSettings.height + ']' : '',
+        'fixed-width-table',
+        (columnPinning && (state.columnPinning.value.left?.length)) ? 'has-pinned-columns' : ''
+      ]" :table-layout="props.tableLayout || 'fixed'">
+        <!-- En-tête du tableau -->
+        <TableHeader :table="table" :tableSettings="tableSettings" :columnPinning="columnPinning"
+          :pinColumnToLeft="pinning.pinColumnToLeft" :unpinColumn="pinning.unpinColumn"
+          :getColumnHeaderStyle="pinning.getColumnHeaderStyle" />
+
+        <!-- Corps du tableau -->
+        <TableBody :table="table" :columns="state.safeColumns.value" :data="state.safeData.value"
+          :loadingState="loadingState" :isEditMode="!!isEditMode" :tableSettings="tableSettings"
+          :displayedRows="tablePagination.displayedRows.value" :handleRowClick="selection.handleRowClick"
+          :getColumnCellStyle="pinning.getColumnCellStyle" />
+      </Table>
     </div>
+
+    <!-- Pagination -->
+    <TablePagination v-if="pagination && table.getRowModel().rows?.length > 0" :table="table"
+      :pageIndex="state.paginationState.value.pageIndex" :totalPages="tablePagination.totalPages.value"
+      :goToPreviousPage="tablePagination.goToPreviousPage" :goToNextPage="tablePagination.goToNextPage" />
+
+    <!-- Boîte de dialogue d'aide pour les raccourcis clavier -->
+    <KeyboardShortcutsHelp v-model:visible="state.keyboardShortcutsHelpVisible.value" />
+  </div>
 </template>
 
-<script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
-import DataTableToolbar from './DataTableToolbar.vue'
-import { exportToCSV, exportToExcel, exportToPDF } from './utils/export'
-// Import direct du composant HotTable pour éviter les problèmes de résolution
-import { HotTable } from '@handsontable/vue3'
+<script setup lang="ts" generic="TData">
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import {
+  FlexRender,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  useVueTable
+} from '@tanstack/vue-table'
+
+import { Button } from '@/components/ui/button'
+import { Table } from '@/components/ui/table'
+import { Save, X } from 'lucide-vue-next'
+import DataTableSideToolbar from './utils/tanstack/DataTableSideToolbar.vue'
+
+// Composants refactorisés
+import TableHeader from './components/TableHeader.vue'
+import TableBody from './components/TableBody.vue'
+import TablePagination from './components/TablePagination.vue'
+import TableToolbar from './components/TableToolbar.vue'
+import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp.vue'
+
+// Composables
+import { useTableState } from './composables/useTableState'
+import { useTablePinning } from './composables/useTablePinning'
+import { useTableSelection } from './composables/useTableSelection'
+import { useTableEditing } from './composables/useTableEditing'
+import { useTablePagination } from './composables/useTablePagination'
+import { useTableSearch } from './composables/useTableSearch'
+import { useTableExport } from './composables/useTableExport'
 
 // Types
-interface Column {
-    data: string
-    title: string
-    required?: boolean
-    width?: number
-    className?: string
-    readOnly?: boolean
+import type { DataTableProps, DataTableEmits } from './types/table-types'
+import type { Table as TableType } from '@tanstack/vue-table'
+
+// Props du composant
+const props = defineProps<DataTableProps<TData>>()
+
+// Évènements émis
+const emit = defineEmits<DataTableEmits<TData>>()
+
+// Initialiser l'état global
+const state = useTableState<TData>(props)
+
+// Computed pour le mode édition
+const isEditMode = computed(() => state.isEditMode.value)
+
+// Création d'un type pour la métadonnée de la table pour éviter la référence circulaire
+const tableMeta = {
+  isEditMode: props.isEditable,
+  pendingChanges: state.pendingChanges.value,
+  handleCellChange: (rowId: string, columnId: string, value: any) => {
+    // Cette fonction sera mise à jour après l'initialisation de la table
+  },
+  activeCell: null as { rowId: string; columnId: string } | null,
+  setActiveCell: (rowId: string, columnId: string) => {
+    if (tableMeta) {
+      tableMeta.activeCell = { rowId, columnId };
+    }
+  },
 }
 
-interface TableProps {
-    tableData: any[]
-    tableColumns?: Column[]
-    tableHeight?: number | string
-    tableWidth?: number | string
-    tableSettings?: Record<string, any>
-    isEditable?: boolean
-    toolbarConfig?: {
-        searchPlaceholder?: string
-        exportFileName?: string
-    }
-    cellRenderers?: Record<string, (value: any, row: any) => string>
-    loadingState?: boolean
-}
-
-const props = withDefaults(defineProps<TableProps>(), {
-    tableHeight: 'auto',
-    tableWidth: 'auto',
-    isEditable: true,
-    tableSettings: () => ({}),
-    toolbarConfig: () => ({
-        searchPlaceholder: 'Rechercher...',
-        exportFileName: 'export'
-    }),
-    loadingState: false
-})
-
-const emit = defineEmits<{
-    'update:tableData': [data: any[]];
-    'change': [changes: any[]];
-    'selection': [selectedRows: any[]];
-    'delete-request': [rowData: any[]];
-}>()
-
-const isHydrated = ref(false)
-const tableContainer = ref<HTMLElement | null>(null)
-const hotTableRef = ref<any>(null)
-const selectedItems = ref<any[]>([])
-const visibleColumnIds = ref<string[]>(props.tableColumns?.map(col => col.data) || [])
-const searchQuery = ref('')
-const isReadOnly = ref(true)
-
-const tableStyle = computed(() => ({
-    height: props.tableHeight === 'auto' ? 'auto' : `${props.tableHeight}px`,
-    width: props.tableWidth === 'auto' ? '100%' : `${props.tableWidth}px`,
-    backgroundColor: 'var(--background)',
-    borderRadius: '8px',
-    overflow: 'hidden'
-}))
-
-// Computed properties
-const processedTableData = computed(() => {
-    const data = filterTableData.value
-    if (!data || !Array.isArray(data)) return []
-
-    return data.map(row => {
-        const processedRow: Record<string, any> = {}
-        props.tableColumns?.forEach(column => {
-            if (!visibleColumnIds.value.includes(column.data)) return
-
-            let value = row[column.data]
-
-            if (props.cellRenderers?.[column.data]) {
-                value = props.cellRenderers[column.data](value, row)
-            }
-
-            processedRow[column.data] = value
-        })
-        return processedRow
-    })
-})
-
-const filterTableData = computed(() => {
-    if (!searchQuery.value) return props.tableData
-
-    return props.tableData.filter((row: any) => {
-        return Object.entries(row).some(([key, value]) => {
-            if (!visibleColumnIds.value.includes(key)) return false
-            return String(value).toLowerCase().includes(searchQuery.value.toLowerCase())
-        })
-    })
-})
-
-const columnHeaders = computed(() => {
-    if (!props.tableColumns) return true
-    return props.tableColumns
-        .filter(col => visibleColumnIds.value.includes(col.data))
-        .map(col => col.title || col.data)
-})
-
-const mergedTableSettings = computed(() => {
-    const columnSettings = props.tableColumns
-        ?.filter(col => visibleColumnIds.value.includes(col.data))
-        .map(col => ({
-            ...col,
-            className: `${col.className || ''} text-xs`,
-            readOnly: isReadOnly.value || col.readOnly,
-        }));
-
-    return {
-        licenseKey: 'non-commercial-and-evaluation',
-        readOnly: isReadOnly.value,
-        columns: columnSettings,
-        colHeaders: columnHeaders.value,
-        filters: true,
-        dropdownMenu: true,
-        columnSorting: true,
-        manualColumnResize: true,
-        selectionMode: 'multiple',
-        outsideClickDeselects: false,
-        stretchH: 'all',
-        autoWrapRow: false,
-        rowHeights: 22,
-        colWidths: 100,
-        renderAllRows: false,
-        viewportRowRenderingOffset: 10,
-        fixedRowsTop: 1,
-        fixedColumnsLeft: 0,
-        wordWrap: false,
-        trimWhitespace: true,
-        tabMoves: { row: 1, col: 1 },
-        enterMoves: { row: 1, col: 0 },
-        fillHandle: false,
-        autoColumnSize: false,
-        afterChange: (changes: any[], source: string) => {
-            if (changes && source !== 'loadData') {
-                handleChange(changes)
-            }
-        },
-        contextMenu: {
-            items: {
-                row_above: false,
-                row_below: false,
-                hsep1: false,
-                col_left: false,
-                col_right: false,
-                hsep2: false,
-                remove_row: false,
-                remove_col: false,
-                hsep3: false,
-                undo: false,
-                redo: false,
-                hsep4: false,
-                make_read_only: false,
-                alignment: false,
-                hsep5: false,
-                borders: false,
-                commentsAddEdit: false,
-                commentsRemove: false
-            }
-        },
-        afterSelectionEnd: (rowStart: number, colStart: number, rowEnd: number, colEnd: number) => {
-            handleSelection(rowStart, colStart, rowEnd, colEnd)
-        },
-        afterOnCellMouseDown: (event: MouseEvent, coords: any, TD: HTMLElement) => {
-            const deleteButton = TD.querySelector('.delete-button');
-            if (deleteButton && (event.target === deleteButton || deleteButton.contains(event.target as Node))) {
-                event.stopPropagation();
-                const rowData = processedTableData.value[coords.row];
-                if (rowData) {
-                    // Émettre un événement pour la suppression au lieu de gérer directement
-                    emit('delete-request', [rowData]);
-                }
-            }
-        },
-        ...props.tableSettings
-    }
-})
-
-const handleSelection = (rowStart: number, colStart: number, rowEnd: number, colEnd: number) => {
-    console.log('Selection event:', { rowStart, colStart, rowEnd, colEnd })
-    const hotTable = hotTableRef.value?.hotInstance
-
-    if (!hotTable) {
-        console.warn('HotTable instance not found')
-        return
-    }
-
-    const selected: any[] = []
-    const rowIndexes = new Set<number>()
-
-    const selectedRanges = hotTable.getSelected() || []
-    console.log('Selected ranges:', selectedRanges)
-
-    selectedRanges.forEach(([fromRow, fromCol, toRow, toCol]: number[]) => {
-        for (let row = Math.min(fromRow, toRow); row <= Math.max(fromRow, toRow); row++) {
-            rowIndexes.add(row)
-        }
-    })
-
-    Array.from(rowIndexes).forEach((rowIndex: number) => {
-        if (processedTableData.value[rowIndex]) {
-            selected.push(processedTableData.value[rowIndex])
-        }
-    })
-
-    selectedItems.value = selected
-    emit('selection', selected)
-}
-
-const handleExport = async (format: string) => {
-    console.log('Export demandé:', format)
-    console.log('Données sélectionnées:', selectedItems.value)
-
-    // Si des éléments sont sélectionnés, on n'exporte que ceux-là
-    const dataToExport = selectedItems.value.length > 0
-        ? [...selectedItems.value]
-        : [...processedTableData.value]
-
-    // Récupérer uniquement les colonnes visibles
-    const visibleColumns = props.tableColumns?.filter(col => visibleColumnIds.value.includes(col.data)) || []
-
+// Configuration de la table avec gestion des erreurs et des états
+const table = useVueTable<TData>({
+  get data() {
     try {
-        const filename = props.toolbarConfig?.exportFileName || 'export'
-        
-        switch (format) {
-            case 'csv':
-                await exportToCSV(dataToExport, visibleColumns, filename)
-                break
-            case 'excel':
-                await exportToExcel(dataToExport, visibleColumns, filename)
-                break
-            case 'pdf':
-                await exportToPDF(dataToExport, visibleColumns, filename)
-                break
-            default:
-                console.warn('Format d\'export non supporté:', format)
-        }
-    } catch (error) {
-        console.error('Erreur lors de l\'export:', error)
+      return state.safeData.value
+    } catch (e) {
+      console.error("Erreur lors de l'accès aux données :", e)
+      return []
     }
-}
-
-// Methods
-const handleChange = (changes: any[]) => {
-    console.log('DataTable handleChange called with:', changes)
-    if (!changes) return
-
-    if (props.isEditable && changes) {
-        const newData = [...processedTableData.value]
-        changes.forEach(([row, prop, oldValue, newValue]) => {
-            if (newData[row]) {
-                // Mise à jour de la valeur dans les données
-                const propPath = prop.split('.')
-                let current = newData[row]
-                
-                for (let i = 0; i < propPath.length - 1; i++) {
-                    if (!current[propPath[i]]) {
-                        current[propPath[i]] = {}
-                    }
-                    current = current[propPath[i]]
-                }
-                current[propPath[propPath.length - 1]] = newValue
-            }
-        })
-        
-        console.log('Nouvelles données après modification:', newData)
-        emit('update:tableData', newData)
-        emit('change', changes)
+  },
+  get columns() {
+    try {
+      return state.safeColumns.value
+    } catch (e) {
+      console.error("Erreur lors de l'accès aux colonnes :", e)
+      return []
     }
-}
-
-const handleSearch = (value: string) => {
-    searchQuery.value = value
-}
-
-const toggleColumn = (columnId: string) => {
-    const index = visibleColumnIds.value.indexOf(columnId)
-    if (index === -1) {
-        visibleColumnIds.value.push(columnId)
-    } else {
-        visibleColumnIds.value.splice(index, 1)
+  },
+  onSortingChange: (updaterOrValue) => state.valueUpdater(updaterOrValue, state.sorting),
+  onColumnFiltersChange: (updaterOrValue) => state.valueUpdater(updaterOrValue, state.columnFilters),
+  onColumnVisibilityChange: (updaterOrValue) => state.valueUpdater(updaterOrValue, state.columnVisibility),
+  onRowSelectionChange: (updaterOrValue) => state.valueUpdater(updaterOrValue, state.rowSelectionState),
+  onColumnPinningChange: (updaterOrValue) => state.valueUpdater(updaterOrValue, state.columnPinning),
+  onPaginationChange: (updaterOrValue) => state.valueUpdater(updaterOrValue, state.paginationState),
+  getCoreRowModel: getCoreRowModel(),
+  getSortedRowModel: getSortedRowModel(),
+  getFilteredRowModel: getFilteredRowModel(),
+  getPaginationRowModel: undefined,
+  state: {
+    get sorting() { return state.sorting.value },
+    get columnFilters() { return state.columnFilters.value },
+    get columnVisibility() { return state.columnVisibility.value },
+    get rowSelection() { return state.rowSelectionState.value },
+    get columnPinning() { return state.columnPinning.value },
+    get pagination() { return props.pagination ? state.paginationState.value : undefined },
+  },
+  meta: tableMeta,
+  enableRowSelection: props.rowSelection && !isEditMode.value, // Désactiver la sélection en mode édition
+  enableMultiRowSelection: props.rowSelection && !isEditMode.value,
+  enableColumnPinning: props.columnPinning,
+  debugTable: false,
+  debugHeaders: false,
+  debugColumns: false,
+  getRowId: (row: any) => {
+    // Tenter d'utiliser une clé primaire commune
+    for (const key of ['id', 'ID', '_id', 'uuid', 'key']) {
+      if (row[key] !== undefined) {
+        return String(row[key])
+      }
     }
+
+    // Sinon, utiliser JSON.stringify comme fallback
+    return JSON.stringify(row)
+  },
+})
+
+// Mettre à jour les fonctions de métadonnées qui ont besoin d'accéder à la table
+tableMeta.handleCellChange = (rowId: string, columnId: string, value: any) => {
+  editing.handleCellChange(rowId, columnId, value)
 }
 
-const toggleReadOnly = () => {
-    isReadOnly.value = !isReadOnly.value
-}
+// Initialiser les autres composables avec la table et l'état
+const pinning = useTablePinning<TData>(table, state.columnPinning)
+const selection = useTableSelection<TData>(
+  table,
+  state.rowSelectionState,
+  state.lastSelectedRowIndex,
+  state.isShiftKeyPressed,
+  state.isCtrlKeyPressed,
+  state.isMetaKeyPressed,
+  emit
+)
+const editing = useTableEditing<TData>(table, state.readOnly, state.pendingChanges, props, emit)
+const tablePagination = useTablePagination<TData>(table, state.paginationState, state.safeData)
+const search = useTableSearch<TData>(table, props)
+const exporter = useTableExport<TData>(table, emit)
 
-onMounted(async () => {
-    await nextTick()
-    isHydrated.value = true
+// Handler pour la gestion des raccourcis clavier
+const handleKeyDown = selection.handleKeyDown
+const handleKeyUp = selection.handleKeyUp
+
+// Handler pour l'export
+const handleExport = exporter.handleExport
+
+// Handler pour le basculement du mode édition
+const handleToggleReadOnly = editing.handleToggleReadOnly
+
+// Exposer l'instance de la table pour permettre un accès externe
+defineExpose({
+  table,
+})
+
+// Initialisation au montage du composant
+onMounted(() => {
+  // Initialiser à partir du localStorage
+  state.initFromLocalStorage()
+
+  // Configurer les écouteurs d'événements pour les raccourcis clavier
+  selection.setupKeyboardListeners()
+
+  // Forcer une mise à jour de l'affichage des colonnes épinglées
+  if (props.columnPinning) {
+    state.forceUpdatePinning(table)
+  }
+
+  // Configurer l'éditeur si nécessaire
+  if (props.isEditable) {
+    editing.setupEditingKeyboardListeners()
+  }
+})
+
+// Nettoyage des écouteurs d'événements
+onUnmounted(() => {
+  selection.cleanupKeyboardListeners()
+
+  if (props.isEditable) {
+    editing.cleanupEditingKeyboardListeners()
+  }
 })
 </script>
 
-<style>
-/* Styles de base */
-.data-table-wrapper {
-    position: relative;
-    z-index: 1;
+<style scoped>
+/* Wrapper de la table avec positionnement relatif pour la barre d'outils latérale */
+.datatable-wrapper {
+  position: relative;
+  padding-left: 0.5rem;
+  /* Espace à gauche pour la barre d'outils latérale */
 }
 
-.handsontable {
-    font-size: 11px !important;
+/* Mode pleine largeur */
+.full-width-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  padding: 1rem;
+  overflow: auto;
+  transition: all 0.3s ease;
 }
 
-/* Ajustement des z-index pour éviter les conflits avec les modals */
-.handsontable .wtHolder,
-.handsontable .ht_master,
-.handsontable .ht_clone_top,
-.handsontable .ht_clone_left,
-.handsontable .ht_clone_top_left_corner {
-    z-index: 10 !important;
+/* Overlay semi-transparent pour le fond */
+.full-width-container::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: -1;
+  backdrop-filter: blur(2px);
 }
 
-/* Assurer que les menus contextuels restent sous les modals */
-.handsontable .htDropdownMenu,
-.handsontable .htContextMenu,
-.handsontable .htFiltersMenuCondition {
-    z-index: 1000 !important;
+.dark .full-width-container::before {
+  background-color: rgba(0, 0, 0, 0.85);
 }
 
-/* Style compact pour les cellules */
-.handsontable td {
-    padding: 0 4px !important;
-    height: 22px !important;
-    line-height: 22px !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    vertical-align: middle !important;
-    background-clip: padding-box !important;
+/* Style pour la barre d'outils en mode pleine largeur */
+.toolbar-fullwidth {
+  background-color: var(--background, white);
+  border-radius: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-/* Style des en-têtes */
-.handsontable th {
-    padding: 0 4px !important;
-    height: 22px !important;
-    line-height: 22px !important;
-    font-size: 11px !important;
-    font-weight: 500 !important;
-    text-align: left !important;
-    vertical-align: middle !important;
+.dark .toolbar-fullwidth {
+  background-color: var(--background, #020617);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 
-/* Dark mode - Style de base */
-.dark .handsontable {
-    background: #1a1a1a !important;
+/* Conteneur du tableau avec effet d'élévation */
+.full-width-container :deep(.rounded-md.border) {
+  background-color: var(--background, white);
+  border-radius: 0.5rem;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  overflow: hidden;
 }
 
-.dark .handsontable td {
-    background: #1a1a1a !important;
-    color: #ffffff !important;
-    border-color: #333333 !important;
+.dark .full-width-container :deep(.rounded-md.border) {
+  background-color: var(--background, #020617);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
 }
 
-.dark .handsontable tbody tr:nth-of-type(even) td {
-    background: #262626 !important;
+/* S'assurer que le tableau prend toute la hauteur disponible en mode pleine largeur */
+.full-width-container :deep(.fixed-width-table) {
+  height: calc(100vh - 170px) !important;
+  max-height: none !important;
+  overflow: auto;
 }
 
-.dark .handsontable th {
-    background: #262626 !important;
-    color: #ffffff !important;
-    border-color: #333333 !important;
+/* Ajouter une animation de transition pour un basculement fluide */
+:deep(.fixed-width-table) {
+  transition: all 0.3s ease;
 }
 
-/* Dark mode - En-têtes fixes */
-.dark .handsontable .ht_clone_top th,
-.dark .handsontable .ht_clone_left td,
-.dark .handsontable .ht_clone_top_left_corner th {
-    background: #262626 !important;
+/* Assurer que la pagination est également bien visible en mode pleine largeur */
+.full-width-container>.flex.items-center.justify-between.py-4:last-child {
+  background-color: var(--background, white);
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
 }
 
-/* Dark mode - Menus contextuels */
-.dark .handsontable .htDropdownMenu {
-    background: #262626 !important;
-    border-color: #333333 !important;
-    color: #ffffff !important;
+.dark .full-width-container>.flex.items-center.justify-between.py-4:last-child {
+  background-color: var(--background, #020617);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5);
 }
 
-.dark .htDropdownMenu .ht_master .wtHolder {
-    background: #262626 !important;
+.loading-spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-left-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
-/* Dark mode - Sélection */
-.dark .handsontable tbody tr.ht__highlight td {
-    background: #2a4365 !important;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.dark .handsontable .wtBorder.current {
-    background: #4299e1 !important;
+:global(.cursor-pointer) {
+  cursor: pointer;
 }
 
-/* Style pour les badges de statut en mode sombre */
-.dark .handsontable td.htCenter div[class*="inline-flex"] {
-    background-color: rgba(255, 255, 255, 0.1) !important;
+:global([data-state="selected"]) {
+  background-color: rgba(34, 197, 94, 0.1) !important;
 }
 
-.dark .handsontable td div[class*="bg-green-100"] {
-    background-color: rgba(34, 197, 94, 0.2) !important;
-    color: rgb(34, 197, 94) !important;
+:global([data-state="selected"] td) {
+  background-color: rgba(34, 197, 94, 0.1) !important;
 }
 
-.dark .handsontable td div[class*="bg-red-100"] {
-    background-color: rgba(239, 68, 68, 0.2) !important;
-    color: rgb(239, 68, 68) !important;
+.dark :global([data-state="selected"]),
+.dark :global([data-state="selected"] td) {
+  background-color: rgba(34, 197, 94, 0.2) !important;
 }
 
-.dark .handsontable td div[class*="bg-blue-100"] {
-    background-color: rgba(59, 130, 246, 0.2) !important;
-    color: rgb(59, 130, 246) !important;
+/* Styles pour la table à largeur fixe */
+:deep(.fixed-width-table) {
+  width: auto !important;
+  table-layout: fixed !important;
+  font-size: 0.75rem !important;
+  /* text-xs équivalent */
 }
 
-.dark .handsontable td div[class*="bg-yellow-100"] {
-    background-color: rgba(234, 179, 8, 0.2) !important;
-    color: rgb(234, 179, 8) !important;
+:deep(.fixed-width-table thead tr),
+:deep(.fixed-width-table tbody tr) {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
 }
 
-.dark .handsontable td div[class*="bg-purple-100"] {
-    background-color: rgba(168, 85, 247, 0.2) !important;
-    color: rgb(168, 85, 247) !important;
+:deep(.fixed-width-cell) {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 0.75rem !important;
+  /* text-xs équivalent */
 }
 
-.dark .handsontable td div[class*="bg-gray-100"] {
-    background-color: rgba(156, 163, 175, 0.2) !important;
-    color: rgb(156, 163, 175) !important;
+/* Empêcher le redimensionnement automatique */
+:deep(th),
+:deep(td) {
+  box-sizing: border-box !important;
+  white-space: nowrap !important;
+  padding: 0.25rem 0.5rem !important;
+  /* p-1 équivalent */
 }
 
-/* Style pour les boutons d'action en mode sombre */
-.dark .handsontable .edit-button {
-    color: rgb(156, 163, 175) !important;
+/* Styles pour le contenu des cellules */
+:deep(td > div),
+:deep(th > div) {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 0.75rem !important;
+  /* text-xs équivalent */
 }
 
-.dark .handsontable .edit-button:hover {
-    color: rgb(59, 130, 246) !important;
+/* Styles pour les colonnes épinglées */
+:deep(.has-pinned-columns) {
+  position: relative;
+  overflow: auto;
 }
 
-.dark .handsontable .delete-button {
-    color: rgb(156, 163, 175) !important;
+:deep(.has-pinned-columns table) {
+  position: relative;
 }
 
-.dark .handsontable .delete-button:hover {
-    color: rgb(239, 68, 68) !important;
+:deep(thead th.sticky),
+:deep(tbody td.sticky) {
+  position: sticky !important;
+  z-index: 1;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Style des filtres en mode sombre */
-.dark .handsontable .columnSorting.ascending::after,
-.dark .handsontable .columnSorting.descending::after {
-    color: #ffffff !important;
+:deep(thead th.sticky.left-0),
+:deep(tbody td.sticky.left-0) {
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+  left: 0;
+  z-index: 2;
+  backdrop-filter: blur(4px);
 }
 
-/* Assurer que les éléments de l'interface utilisateur restent au-dessus de Handsontable */
-:deep(.dialog-overlay),
-:deep(.dialog-content) {
-    z-index: 9999 !important;
+/* Assurer que le header des colonnes épinglées est plus visible */
+:deep(thead th.sticky) {
+  z-index: 3 !important;
+  background-color: var(--gray-500, #6b7280) !important;
+  color: white !important;
+}
+
+.dark :deep(thead th.sticky) {
+  background-color: var(--gray-800, #1f2937) !important;
+  color: var(--gray-200, #e5e7eb) !important;
+}
+
+/* Style pour les colonnes épinglées en mode sombre */
+.dark :deep(tbody td.sticky) {
+  background-color: inherit !important;
+}
+
+/* Styles spécifiques pour mieux visualiser les colonnes épinglées */
+:deep(.pinned-left),
+:deep(.pinned-right) {
+  position: relative;
+}
+
+/* Effet visuel pour distinguer les colonnes épinglées */
+:deep(.pinned-left)::after,
+:deep(.pinned-right)::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  background-color: rgba(34, 197, 94, 0.05);
+  pointer-events: none;
+}
+
+.dark :deep(.pinned-left)::after,
+.dark :deep(.pinned-right)::after {
+  background-color: rgba(34, 197, 94, 0.1);
+}
+
+:deep(.pinned-left) {
+  border-right: 2px solid var(--green-500, #22c55e) !important;
+}
+
+:deep(.pinned-right) {
+  border-left: 2px solid var(--green-500, #22c55e) !important;
+}
+
+/* Ajuster le curseur pour indiquer que les colonnes épinglées sont spéciales */
+:deep(th.sticky .group-hover\:opacity-100),
+:deep(td.sticky .group-hover\:opacity-100) {
+  opacity: 1 !important;
+}
+
+/* Animation pour les colonnes nouvellement épinglées */
+@keyframes highlight-pinned {
+  0% {
+    background-color: rgba(59, 130, 246, 0.2);
+  }
+
+  100% {
+    background-color: rgba(59, 130, 246, 0.05);
+  }
+}
+
+:deep(.pinned-left)::after {
+  animation: highlight-pinned 1s ease-out;
+}
+
+/* Amélioration de l'apparence des boutons d'épinglage */
+:deep(.pinned-left .h-3\.5.w-3\.5),
+:deep(th:hover .h-3\.5.w-3\.5) {
+  opacity: 1 !important;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+:deep(th:hover .h-3\.5.w-3\.5:hover) {
+  transform: scale(1.2);
+}
+
+/* Assurer que les colonnes épinglées respectent le style alterné des lignes */
+:deep(tbody tr:nth-child(even) td.sticky) {
+  background-color: var(--white, white) !important;
+}
+
+:deep(tbody tr:nth-child(odd) td.sticky) {
+  background-color: var(--gray-50, #f9fafb) !important;
+}
+
+.dark :deep(tbody tr:nth-child(even) td.sticky) {
+  background-color: var(--gray-950, #030712) !important;
+}
+
+.dark :deep(tbody tr:nth-child(odd) td.sticky) {
+  background-color: var(--gray-900, #111827) !important;
+}
+
+/* Assurer que les colonnes épinglées respectent la sélection */
+:deep(tbody tr[data-state="selected"] td),
+:deep(tbody tr[data-state="selected"] td.sticky) {
+  background-color: rgba(34, 197, 94, 0.1) !important;
+}
+
+.dark :deep(tbody tr[data-state="selected"] td),
+.dark :deep(tbody tr[data-state="selected"] td.sticky) {
+  background-color: rgba(34, 197, 94, 0.2) !important;
+}
+
+/* Réduire la hauteur des lignes pour un tableau plus compact */
+:deep(tbody tr) {
+  height: 28px !important;
+  /* Hauteur réduite pour les lignes */
+}
+
+:deep(thead tr) {
+  height: 32px !important;
+  /* Hauteur légèrement plus grande pour l'en-tête */
+}
+
+/* Réduire l'espacement vertical dans les cellules */
+:deep(td),
+:deep(th) {
+  padding-top: 0.125rem !important;
+  /* py-0.5 équivalent */
+  padding-bottom: 0.125rem !important;
+}
+
+/* Styles pour le tableau en mode normal avec défilement */
+.datatable-container {
+  max-height: 500px;
+  /* Hauteur maximale en mode normal */
+  overflow: auto;
+}
+
+/* Permettre le défilement du tableau même en mode normal */
+:deep(.fixed-width-table) {
+  width: auto !important;
+  table-layout: fixed !important;
+  font-size: 0.75rem !important;
+  /* text-xs équivalent */
+  overflow: visible;
+  /* Pour permettre au conteneur parent de gérer le défilement */
+}
+
+/* Styles pour le mode édition */
+.datatable-edit-mode .editable-cell {
+  position: relative;
+  cursor: text !important;
+  transition: all 0.2s ease;
+}
+
+.datatable-edit-mode .editable-cell:hover {
+  background-color: rgba(59, 130, 246, 0.05) !important;
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.3);
+}
+
+.datatable-edit-mode .editable-cell::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 6px 6px 0;
+  border-color: transparent rgba(59, 130, 246, 0.3) transparent transparent;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.datatable-edit-mode .editable-cell:hover::after {
+  opacity: 1;
+}
+
+/* Ajuster l'apparence en mode édition */
+.datatable-edit-mode tbody tr:hover {
+  background-color: inherit !important;
+}
+
+/* Style pour les cellules modifiées */
+.datatable-edit-mode .modified-cell {
+  background-color: rgba(250, 204, 21, 0.1) !important;
+  box-shadow: inset 0 0 0 1px rgba(202, 138, 4, 0.5);
+}
+
+.datatable-edit-mode .modified-cell::after {
+  border-color: transparent rgba(202, 138, 4, 0.5) transparent transparent;
+  opacity: 1;
 }
 </style>
